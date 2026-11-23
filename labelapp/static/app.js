@@ -5,6 +5,7 @@ let design = localStorage.getItem('design') || 'classic';
 const data = () => {
   const o = {design, copies: Math.max(1, parseInt($('#copies').value) || 1)};
   FIELDS.forEach(i => o[i.dataset.f] = i.value.trim() || null);
+  if (o.dose) o.dose = o.dose.replace(',', '.');   // '17,5' -> '17.5' (a number input would read it as 175)
   return o;
 };
 const show = (el, text, cls) => { el.hidden = !text; el.textContent = text || ''; el.className = 'msg ' + (cls || ''); };
@@ -67,7 +68,7 @@ async function extract(req) {
     show($('#extract-msg'), `Filled ${n} field(s). Check them before printing.`, 'ok');
     updatePreview();
   } catch (e) {
-    show($('#extract-msg'), `${e.message}. You can still fill the fields in by hand.`, 'err');
+    show($('#extract-msg'), `${e.message.replace(/[.\s]+$/, '')}. You can still fill the fields in by hand.`, 'err');
   } finally {
     extracting = false; $('#busy').hidden = true;
     extractInputs().forEach(el => el.disabled = false); $('#drop').classList.remove('disabled');
@@ -107,7 +108,12 @@ setInterval(() => { if (!document.hidden && !printing) refreshStatus(); }, 20000
 let printing = false;
 $('#print').onclick = async () => {
   const d = data(), msg = $('#print-msg');
-  if (!(parseFloat(d.dose) > 0)) { show(msg, 'Enter the dose in grams first.', 'err'); $('#dose').focus(); return; }
+  const g = Number(d.dose), n = Number($('#copies').value);
+  if (!d.dose || !(g > 0 && g <= 1000)) {
+    show(msg, d.dose ? 'The dose must be a number of grams above 0 and up to 1000.' : 'Enter the dose in grams first.', 'err');
+    $('#dose').focus(); return;
+  }
+  if (!Number.isInteger(n) || n < 1 || n > 50) { show(msg, 'Copies must be a whole number from 1 to 50.', 'err'); $('#copies').focus(); return; }
   printing = true; $('#print').disabled = true;
   show(msg, `Printing ${d.copies} label(s)...`, 'info');
   const poll = setInterval(async () => { try { const p = await (await fetch('/api/print/progress')).json();

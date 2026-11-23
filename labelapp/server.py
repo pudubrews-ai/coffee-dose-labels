@@ -1,5 +1,4 @@
 import io
-import math
 import os
 from contextlib import asynccontextmanager
 from datetime import date
@@ -9,7 +8,7 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from . import config as C, designs, extract
-from .designs.common import fmt_date
+from .designs.common import fmt_date, fmt_dose
 from .printer import PrinterError, printer
 
 MAX_UPLOAD = 25_000_000
@@ -98,11 +97,8 @@ async def extract_image(file: UploadFile = File(...)):
 
 @app.post("/api/print")
 async def print_label(l: Label):
-    try:
-        dose = float(l.dose or "")
-        if not (math.isfinite(dose) and 0 < dose <= 1000): raise ValueError
-    except ValueError:
-        raise HTTPException(400, "Dose in grams is required (a number up to 1000).")
+    if not fmt_dose(l.model_dump()):         # same parsing as the preview (accepts '17,5')
+        raise HTTPException(400, "Dose in grams is required (a number above 0, up to 1000).")
     if not 1 <= l.copies <= 50:
         raise HTTPException(400, "Copies must be between 1 and 50.")
     im = render_label(l)
