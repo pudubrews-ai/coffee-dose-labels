@@ -91,17 +91,6 @@ def _field(d, x, y, label, value, maxw, size=24, lines=1, max_h=None):
     return draw_lines(d, x, y + 19, ls, f, lh) + 8
 
 
-def _mrz(data, dose, n=30):
-    def clean(s):
-        import unicodedata
-        s = unicodedata.normalize("NFKD", s).encode("ascii", "ignore").decode()
-        return "".join(c if c.isalnum() else "<" for c in s.upper())
-    name = clean(val(data, "coffee_name") or "COFFEE")
-    l1 = ("P<VAC" + clean(origin_code(data)) + "<" + name + "<" * n)[:n]
-    l2 = (clean(f"{dose}G") + "<" + batch_code(data) + "<" + clean(val(data, "process") or "BEANS") + "<" * n)[:n]
-    return l1, l2
-
-
 def render(data):
     im, d = new_canvas()
     L, R = MARGIN, W - MARGIN
@@ -143,7 +132,7 @@ def render(data):
         y = max(ys)
 
     # stamps
-    mrz_top = H - MARGIN - 50
+    mrz_top = H - MARGIN - 4   # stamps use the full bottom area
     area_top = max(y + 2, 280)
     area_h = mrz_top - 10 - area_top
     es = _entry_stamp(data, size=max(180, min(222, area_h)))
@@ -162,13 +151,4 @@ def render(data):
             f3, ls, lh3 = fit_block_face(d, notes, nw, avail - 22, 20, MIN_PX, "oblique", leading=1.15)
             draw_lines(d, nx, area_top + 24, ls, f3, lh3)
 
-    # machine-readable zone (decorative)
-    hr(d, mrz_top, w=2)
-    mf = face("mono_bold", 20)
-    l1, l2 = _mrz(data, dose)
-    n = 30
-    while tw(d, l1[:n], mf) > mw and n > 10:
-        n -= 1
-    d.text((L, mrz_top + 8), l1[:n], font=mf, fill=BLACK)
-    d.text((L, mrz_top + 30), l2[:n], font=mf, fill=BLACK)
     return finish(im)
