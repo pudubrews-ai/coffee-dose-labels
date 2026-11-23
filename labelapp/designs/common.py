@@ -148,3 +148,177 @@ def hr(d, y, x0=MARGIN, x1=W - MARGIN, w=2):
 def finish(im):
     assert im.mode == "1" and im.size == (W, H)
     return im
+
+
+# ---------------------------------------------------------------------------
+# Extra helpers for the more decorative designs (all output stays strictly 1-bit).
+
+_FACES = {   # style -> (file, index); falls back to Helvetica Bold/Regular
+    "regular": ("/System/Library/Fonts/Helvetica.ttc", 0),
+    "bold": ("/System/Library/Fonts/Helvetica.ttc", 1),
+    "oblique": ("/System/Library/Fonts/Helvetica.ttc", 2),
+    "bold_oblique": ("/System/Library/Fonts/Helvetica.ttc", 3),
+    "medium": ("/System/Library/Fonts/HelveticaNeue.ttc", 10),
+    "condensed": ("/System/Library/Fonts/HelveticaNeue.ttc", 4),       # Condensed Bold
+    "condensed_black": ("/System/Library/Fonts/HelveticaNeue.ttc", 9),
+    "mono": ("/System/Library/Fonts/Menlo.ttc", 0),
+    "mono_bold": ("/System/Library/Fonts/Menlo.ttc", 1),
+}
+
+
+@lru_cache(maxsize=512)
+def face(style: str, size: int) -> ImageFont.FreeTypeFont:
+    """Named typeface ('bold', 'regular', 'condensed', 'mono_bold', ...) with Helvetica fallback."""
+    path, idx = _FACES.get(style, _FACES["bold"])
+    if size == 20 and idx == 1 and path.endswith("Helvetica.ttc"):
+        size = 20.5          # Helvetica Bold's 1-bit hinting fuses the i-dot into the stem at exactly 20 px
+    try:
+        return ImageFont.truetype(path, size, index=idx)
+    except OSError:
+        return font(size, bold=style not in ("regular", "oblique", "mono"))
+
+
+def fit_line(d, text, maxw, start, minimum, style="bold"):
+    """Largest face(style) size in start..minimum fitting maxw on one line; ellipsizes at minimum.
+    Returns (font, text)."""
+    for s in range(start, minimum - 1, -1):
+        f = face(style, s)
+        if tw(d, text, f) <= maxw:
+            return f, text
+    f = face(style, minimum)
+    return f, ellipsize(d, text, f, maxw)
+
+
+def fit_block_face(d, text, maxw, max_h, start, minimum, style="bold", leading=1.15, max_lines=None):
+    """fit_block() for any face(style). Returns (font, lines, line_h)."""
+    for s in range(start, minimum - 1, -1):
+        f = face(style, s)
+        lh = int(s * leading)
+        lines = wrap(d, text, f, maxw)
+        if (not max_lines or len(lines) <= max_lines) and len(lines) * lh <= max_h:
+            return f, lines, lh
+    f = face(style, minimum)
+    lh = int(minimum * leading)
+    n = max(1, max_h // lh)
+    if max_lines:
+        n = min(n, max_lines)
+    return f, wrap(d, text, f, maxw, max_lines=n), lh
+
+
+def ink_h(d, text, f) -> int:
+    """Height of the inked glyphs above the baseline (cap height for caps/digits)."""
+    bb = d.textbbox((0, 0), text, font=f, anchor="ls")
+    return -bb[1]
+
+
+def dashed_h(d, y, x0, x1, dash=8, gap=6, w=2):
+    x = x0
+    while x < x1:
+        d.rectangle([x, y, min(x + dash, x1) - 1, y + w - 1], fill=BLACK)
+        x += dash + gap
+
+
+def dashed_v(d, x, y0, y1, dash=8, gap=6, w=2):
+    y = y0
+    while y < y1:
+        d.rectangle([x, y, x + w - 1, min(y + dash, y1) - 1], fill=BLACK)
+        y += dash + gap
+
+
+def ring(d, cx, cy, r, w=2):
+    d.ellipse([cx - r, cy - r, cx + r, cy + r], outline=BLACK, width=w)
+
+
+def parse_date(s):
+    """'23 Nov 2026' (fmt_date) or ISO '2026-11-23' -> date, else None."""
+    from datetime import datetime
+    for fmt in ("%d %b %Y", "%Y-%m-%d", "%d %B %Y", "%d/%m/%Y"):
+        try:
+            return datetime.strptime(s.strip(), fmt).date()
+        except (ValueError, AttributeError):
+            continue
+    return None
+
+
+def batch_code(data: dict) -> str:
+    """Short batch number derived from the seal date, e.g. '261123' (or digits of the raw string)."""
+    s = val(data, "seal_date")
+    dt = parse_date(s)
+    if dt:
+        return dt.strftime("%y%m%d")
+    return "".join(c for c in s if c.isdigit())[-6:]
+
+
+def origin_code(data: dict) -> str:
+    """Three-letter pseudo airport code from origin (or region / coffee name)."""
+    for k in ("origin", "region", "coffee_name"):
+        letters = "".join(c for c in val(data, k).upper() if c.isalpha())
+        if len(letters) >= 3:
+            return letters[:3]
+    return "BNS"
+
+
+def notes_list(data: dict, max_items=None) -> list[str]:
+    """Tasting notes split on commas / ' and ' / '&' into tidy capitalised items."""
+    import re
+    raw = val(data, "notes")
+    if not raw:
+        return []
+    parts = [p.strip(" .;") for p in re.split(r",|;|/|\s&\s|\band\b|\bwith\b", raw)]
+    items = [p[:1].upper() + p[1:] for p in parts if p]
+    return items[:max_items] if max_items else items
+
+
+def paste_ink(im, layer, x, y):
+    """Paste the black pixels of a 1-bit layer onto im at (x, y) (white stays transparent)."""
+    mask = layer.point(lambda v: 255 if v == 0 else 0, mode="L")
+    im.paste(BLACK, (int(x), int(y), int(x) + layer.width, int(y) + layer.height), mask)
+
+
+def text_layer(text, f, pad=2, outline=0):
+    """Text rendered alone on a tight 1-bit layer (rotate it with Image.transpose, losslessly).
+    outline=n draws n-px outlined letters instead of solid ones."""
+    tmp = ImageDraw.Draw(Image.new("1", (1, 1)))
+    bb = tmp.textbbox((0, 0), text, font=f, stroke_width=outline)
+    lay = Image.new("1", (bb[2] - bb[0] + 2 * pad, bb[3] - bb[1] + 2 * pad), WHITE)
+    ld = ImageDraw.Draw(lay)
+    ld.fontmode = "1"
+    ld.text((pad - bb[0], pad - bb[1]), text, font=f, fill=WHITE if outline else BLACK,
+            stroke_width=outline, stroke_fill=BLACK)
+    return lay
+
+
+class HiRes:
+    """Scratch canvas drawn at `scale`x in greyscale, then rotated and thresholded back to crisp 1-bit.
+    Used for rotated stamps: thresholding (no dithering) gives clean edges at any angle."""
+
+    def __init__(self, w, h, scale=3):
+        self.s, self.w, self.h = scale, w, h
+        self.im = Image.new("L", (w * scale, h * scale), 255)
+        self.d = ImageDraw.Draw(self.im)
+
+    def font(self, style, size):
+        return face(style, size * self.s)
+
+    def p(self, *v):
+        return [c * self.s for c in v]
+
+    def to_1bit(self, angle=0.0, threshold=150):
+        im = self.im
+        if angle:
+            im = im.rotate(angle, resample=Image.BICUBIC, fillcolor=255)
+        im = im.resize((self.w, self.h), Image.LANCZOS)
+        return im.point(lambda v: 255 if v >= threshold else 0).convert("1", dither=Image.Dither.NONE)
+
+
+def fake_barcode(d, x0, y0, x1, y1, seed="dose"):
+    """Decorative, non-scannable bar pattern (no real symbology) between x0..x1."""
+    import random
+    rnd = random.Random(seed)
+    x = x0
+    while x < x1:
+        bw = rnd.choice((2, 2, 3, 4, 6))
+        if x + bw > x1:
+            break
+        d.rectangle([x, y0, x + bw - 1, y1], fill=BLACK)
+        x += bw + rnd.choice((2, 3, 3, 4, 6))
