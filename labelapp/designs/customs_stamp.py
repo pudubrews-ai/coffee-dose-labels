@@ -47,12 +47,15 @@ def _entry_stamp(data, size=236):
 
     inner = (r_in - 6) * 2
     origin = (val(data, "origin") or val(data, "region") or "Coffee").upper()
-    of, origin = fit_line(_M, origin, inner - 16, 34, 16, "condensed")
+    of, short = fit_line(_M, origin, inner - 16, 34, style="condensed")
+    if short != origin and len(origin.split()[-1]) >= 4:      # 'DEMOCRATIC REPUBLIC OF THE CONGO' -> 'CONGO'
+        of, short = fit_line(_M, origin.split()[-1], inner - 16, 34, style="condensed")
+    origin = short
     seal = val(data, "seal_date").upper()
-    df, seal = fit_line(_M, seal, inner - 34, 20, 14, "bold")
+    df, seal = fit_line(_M, seal, inner - 30, 22, style="condensed")   # condensed: full date at >= 18 px
     d.text((c * s, (c - 16) * s), "ENTRY", font=hs.font("bold", 16), fill=0, anchor="ms")
     d.text((c * s, (c + 14) * s), origin, font=hs.font("condensed", of.size), fill=0, anchor="ms")
-    d.text((c * s, (c + 22) * s), seal, font=hs.font("bold", df.size), fill=0, anchor="ma")
+    d.text((c * s, (c + 22) * s), seal, font=hs.font("condensed", df.size), fill=0, anchor="ma")
     return hs.to_1bit(angle=9)
 
 
@@ -69,10 +72,18 @@ def _dose_stamp(dose, w=168, h=124):
     return hs.to_1bit(angle=-6)
 
 
+def _caption(d, x, y, text):
+    d.text((x, y), text.upper(), font=face("bold", MIN_CAPTION_PX), fill=BLACK)
+
+
 def _field(d, x, y, label, value, maxw, size=24, lines=1, max_h=None):
-    d.text((x, y), label, font=face("regular", 16), fill=BLACK)
-    f, ls, lh = fit_block_face(d, value, maxw, max_h or int(size * 1.12) * lines, size, 18, "bold",
-                               leading=1.12, max_lines=lines)
+    _caption(d, x, y + 1, label)
+    if lines == 1:            # one-line slot: shorten a parenthetical before ellipsizing
+        f, v = fit_short(d, value, maxw, size)
+        ls, lh = [v], int(f.size * 1.12)
+    else:
+        f, ls, lh = fit_block_face(d, value, maxw, max_h or int(size * 1.12) * lines, size, MIN_PX, "bold",
+                                   leading=1.12, max_lines=lines)
     return draw_lines(d, x, y + 19, ls, f, lh) + 8
 
 
@@ -108,8 +119,9 @@ def render(data):
              ("Process", val(data, "process")), ("Variety", val(data, "variety")),
              ("Elevation", val(data, "altitude"))]
     pairs = [(k, v) for k, v in pairs if v]
-    y = _field(d, L, y, "Name / Nom", val(data, "coffee_name") or "Coffee", mw, size=26, lines=3,
-               max_h=60 if len(pairs) > 3 else 90)
+    sparse = len(pairs) <= 1                 # nothing else above the stamps: a long name may take 5 lines
+    y = _field(d, L, y, "Name / Nom", val(data, "coffee_name") or "Coffee", mw, size=26,
+               lines=5 if sparse else 3, max_h=150 if sparse else 60 if len(pairs) > 3 else 90)
     stamp_top_min = 300
     # two columns for the short ones, full width for the long ones
     full = [p for p in pairs if p[0] in ("Issued by", "Place of birth")]
@@ -132,7 +144,7 @@ def render(data):
     area_h = mrz_top - 10 - area_top
     es = _entry_stamp(data, size=max(180, min(222, area_h)))
     paste_ink(im, es, L - 8, area_top + (area_h - es.height) // 2)
-    ds = _dose_stamp(dose)
+    ds = _dose_stamp(dose_text(data))
     paste_ink(im, ds, R - ds.width + 6, mrz_top - 6 - ds.height)
 
     # tasting notes as a handwritten-ish visa remark, top right of stamp area
@@ -142,8 +154,8 @@ def render(data):
         nw = R - nx
         avail = (mrz_top - 10 - ds.height) - area_top - 8
         if nw > 100 and avail > 40:
-            d.text((nx, area_top + 4), "Remarks", font=face("regular", 16), fill=BLACK)
-            f3, ls, lh3 = fit_block_face(d, notes, nw, avail - 22, 20, 16, "oblique", leading=1.15)
+            _caption(d, nx, area_top + 5, "Remarks")
+            f3, ls, lh3 = fit_block_face(d, notes, nw, avail - 22, 20, MIN_PX, "oblique", leading=1.15)
             draw_lines(d, nx, area_top + 24, ls, f3, lh3)
 
     # machine-readable zone (decorative)

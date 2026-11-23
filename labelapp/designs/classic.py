@@ -13,13 +13,13 @@ def render(data):
 
     roaster = val(data, "roaster").upper()
     if roaster:
-        s = fit_size(d, roaster, mw, 22, 14)
+        s = fit_size(d, roaster, mw, 22)
         f = font(s)
-        spaced(d, ellipsize(d, roaster, f, mw), L, y, f, spacing=3)
+        spaced(d, ellipsize_spaced(d, roaster, f, mw, 3), L, y, f, spacing=3)
         y += s + 12
 
     # bottom block geometry (dose + dates)
-    dose = fmt_dose(data)
+    dose = dose_text(data)
     seal, roast = val(data, "seal_date"), val(data, "roast_date")
     dates = [("SEALED", seal), ("ROASTED", roast)]
     dates = [(k, v) for k, v in dates if v]
@@ -27,7 +27,10 @@ def render(data):
     foot_top = H - MARGIN - foot_h
 
     name = val(data, "coffee_name") or "Coffee"
-    f, lines, lh = fit_block(d, name, mw, 125, 56, 30, leading=1.08, max_lines=3)
+    n_body = sum(1 for k in ("producer", "process", "variety", "altitude", "notes") if val(data, k))
+    sparse = n_body <= 1                     # little else to show: a long name may take 6 lines
+    f, lines, lh = fit_block(d, name, mw, 230 if sparse else 125, 56, 30, leading=1.08,
+                             max_lines=6 if sparse else 3)
     y = draw_lines(d, L, y, lines, f, lh)
     y += 8
     hr(d, y, w=3); y += 14
@@ -40,7 +43,8 @@ def render(data):
     va = join(val(data, "variety"), val(data, "altitude"))
     if va: body.append((va, False, 24))
     for text, bold, size in body:
-        f2, ls, lh2 = fit_block(d, text, mw, 2 * int(size * 1.2), size, 18, bold=bold, leading=1.15, max_lines=2)
+        f2, ls, lh2 = fit_block(d, text, mw, 2 * int(size * 1.2), size, MIN_PX, bold=bold, leading=1.15,
+                                max_lines=2)
         if y + len(ls) * lh2 > foot_top - 10: break
         y = draw_lines(d, L, y, ls, f2, lh2) + 4
     notes = val(data, "notes")
@@ -48,7 +52,7 @@ def render(data):
         y += 6
         avail = foot_top - 14 - y
         if avail >= 24:
-            f3, ls, lh3 = fit_block(d, notes, mw, avail, 26, 18, bold=False, leading=1.2)
+            f3, ls, lh3 = fit_block(d, notes, mw, avail, 26, MIN_PX, bold=False, leading=1.2)
             draw_lines(d, L, y, ls, f3, lh3)
 
     # footer

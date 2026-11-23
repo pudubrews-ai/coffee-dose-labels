@@ -14,7 +14,8 @@ def _row(d, L, R, y, label, value, indent=0, rule=True, size=21):
     x = L + indent
     d.text((x, y), label, font=lf, fill=BLACK)
     x += tw(d, label, lf) + 8
-    d.text((x, y), ellipsize(d, value, vf, R - x), font=vf, fill=BLACK)
+    vf, value = fit_short(d, value, R - x, size, size, "regular")
+    d.text((x, y), value, font=vf, fill=BLACK)
     return y + size + 4
 
 
@@ -24,7 +25,7 @@ def render(data):
     d.rectangle([BL, BT, BR, BB], outline=BLACK, width=2)
     L, R = BL + 12, BR - 12
     mw = R - L
-    dose = fmt_dose(data)
+    dose = dose_text(data)
     y = BT + 6
 
     # title + product
@@ -32,12 +33,15 @@ def render(data):
     d.text((L - 2, y + ink_h(d, "D", tf) + 2), title, font=tf, fill=BLACK, anchor="ls")
     y += ink_h(d, "D", tf) + 10
     d.rectangle([L, y, R, y + 1], fill=BLACK); y += 6
-    f, lines, lh = fit_block_face(d, val(data, "coffee_name") or "Coffee", mw, 50, 23, 18, "bold",
-                                  leading=1.08, max_lines=2)
+    n_rows = sum(1 for k in ("origin", "region", "producer", "process", "variety", "altitude", "notes")
+                 if val(data, k))
+    sparse = n_rows <= 2                     # few panel rows: a long name may take 4 lines
+    f, lines, lh = fit_block_face(d, val(data, "coffee_name") or "Coffee", mw, 96 if sparse else 50, 23,
+                                  MIN_PX, "bold", leading=1.08, max_lines=4 if sparse else 2)
     y = draw_lines(d, L, y, lines, f, lh)
     roaster = val(data, "roaster")
     if roaster:
-        rf, roaster = fit_line(d, roaster, mw, 20, 16, "regular")
+        rf, roaster = fit_line(d, roaster, mw, 20, style="regular")
         d.text((L, y), roaster, font=rf, fill=BLACK)
         y += 24
     y += 4
@@ -50,7 +54,7 @@ def render(data):
         if not v:
             continue
         d.text((L, y), k, font=sf, fill=BLACK)
-        vf, vv = fit_line(d, v, mw - tw(d, k, sf) - 12, 22, 16, "bold")
+        vf, vv = fit_line(d, v, mw - tw(d, k, sf) - 12, 22)
         d.text((R, y), vv, font=vf, fill=BLACK, anchor="ra")
         y += 27
     y += 2
@@ -76,7 +80,7 @@ def render(data):
     bottom = foot_y - 7
     notes = val(data, "notes")
     if notes:
-        nf, nl, nlh = fit_block_face(d, "Tasting notes: " + notes, mw, 3 * 22, 19, 16,
+        nf, nl, nlh = fit_block_face(d, "Tasting notes: " + notes, mw, 3 * 22, 19, MIN_PX,
                                      "regular", leading=1.15, max_lines=3)
         top = bottom - 6 - len(nl) * nlh
         draw_lines(d, L, top, nl, nf, nlh)
@@ -91,7 +95,7 @@ def render(data):
             ("Variety", val(data, "variety"), 0), ("Altitude", val(data, "altitude"), 0)]
     rows = [r for r in rows if r[1]]
     pitch = 30
-    fit = max(0, (bottom - 32 - y) // pitch)
+    fit = max(0, (bottom - 32 - y) // pitch)      # rows are 21 px; drop rows rather than shrink
     for k in ("Producer", "Region", "Altitude", "Variety", "Process", "Origin"):
         if len(rows) <= fit:
             break

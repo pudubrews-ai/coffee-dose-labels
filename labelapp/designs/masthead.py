@@ -29,7 +29,7 @@ def _vertical_word(im, d, word, x, top, bottom, max_w):
 def render(data):
     im, d = new_canvas()
     T, B = MARGIN, H - MARGIN
-    dose = fmt_dose(data)
+    dose = dose_text(data)
     word = (val(data, "origin") or val(data, "region") or "Coffee").upper()
 
     col = _vertical_word(im, d, word, MARGIN - 4, T, B, 108)
@@ -63,8 +63,8 @@ def render(data):
     y = T
     roaster = val(data, "roaster").upper()
     if roaster:
-        rf, roaster = fit_line(d, roaster, mw, 18, 14)
-        spaced(d, ellipsize(d, roaster, rf, mw - len(roaster) * 2), L, y, rf, spacing=2)
+        rf, roaster = fit_line(d, roaster, mw, MIN_PX)
+        spaced(d, ellipsize_spaced(d, roaster, rf, mw, 2), L, y, rf, spacing=2)
         y += 30
     details = [val(data, "region"), val(data, "producer"), val(data, "process"),
                val(data, "variety"), val(data, "altitude")]
@@ -74,13 +74,13 @@ def render(data):
                                   "bold", leading=1.06, max_lines=7 if sparse else 4)
     y = draw_lines(d, L, y, lines, f, lh) + 10
     for t in [t for t in details if t]:
-        f2, ls, lh2 = fit_block_face(d, t, mw, 46, 21, 17, "regular", leading=1.12, max_lines=2)
+        f2, ls, lh2 = fit_block_face(d, t, mw, 46, 21, MIN_PX, "regular", leading=1.12, max_lines=2)
         if y + len(ls) * lh2 > limit:
             break
         y = draw_lines(d, L, y, ls, f2, lh2) + 3
     notes = val(data, "notes")
     if notes and limit - y >= 40:
         y += 8
-        f3, ls, lh3 = fit_block_face(d, notes, mw, limit - y, 21, 17, "oblique", leading=1.15)
+        f3, ls, lh3 = fit_block_face(d, notes, mw, limit - y, 21, MIN_PX, "oblique", leading=1.15)
         draw_lines(d, L, y, ls, f3, lh3)
     return finish(im)

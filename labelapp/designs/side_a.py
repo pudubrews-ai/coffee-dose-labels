@@ -35,7 +35,7 @@ def render(data):
     im, d = new_canvas()
     L, R = MARGIN, W - MARGIN
     mw = R - L
-    dose = fmt_dose(data)
+    dose = dose_text(data)
     tracks = notes_list(data, max_items=4)
 
     # top strip
@@ -63,12 +63,12 @@ def render(data):
 
     # title / artist
     name = val(data, "coffee_name") or "Coffee"
-    f, lines, lh = fit_block_face(d, name, mw, 64 if tracks else 96, 30, 20, "bold", leading=1.08,
-                                  max_lines=2 if tracks else 3)
+    f, lines, lh = fit_block_face(d, name, mw, 64 if tracks else 120, 30, 20, "bold", leading=1.08,
+                                  max_lines=2 if tracks else 5)
     y = draw_lines(d, L, y, lines, f, lh)
     artist = val(data, "roaster")
     if artist:
-        af, artist = fit_line(d, artist, mw, 22, 17, "regular")
+        af, artist = fit_line(d, artist, mw, 22, style="regular")
         d.text((L, y + 2), artist, font=af, fill=BLACK)
         y += 28
     y += 6
@@ -85,9 +85,13 @@ def render(data):
             y += 26
         y += 4
     # liner credits: origin, process, variety, altitude
-    credits = join(val(data, "origin"), val(data, "process"),
-                   val(data, "variety"), val(data, "altitude"))
-    if credits and bottom - y >= 20:
-        cf, ls, clh = fit_block_face(d, credits, mw, bottom - y, 18, 16, "oblique", leading=1.15, max_lines=2)
+    # (shorten the process first, then drop altitude, variety, process; never below MIN_PX)
+    room = min(2, (bottom - y) // int(MIN_PX * 1.15))
+    credits = fit_parts(d, [(val(data, "origin"), 0), (val(data, "process"), 1),
+                            (val(data, "variety"), 2), (val(data, "altitude"), 3)],
+                        mw, max(room, 1), MIN_PX, "oblique")
+    if credits and room:
+        cf, ls, clh = fit_block_face(d, credits, mw, bottom - y, MIN_PX, MIN_PX, "oblique", leading=1.15,
+                                     max_lines=room)
         draw_lines(d, L, y, ls, cf, clh)
     return finish(im)

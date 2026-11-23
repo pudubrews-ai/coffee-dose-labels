@@ -13,7 +13,7 @@ def render(data):
     im, d = new_canvas()
     L, R = MARGIN, W - MARGIN
     mw = R - L
-    dose = fmt_dose(data)
+    dose = dose_text(data)
     seal = val(data, "seal_date")
     code = origin_code(data)
     batch = batch_code(data)
@@ -21,10 +21,13 @@ def render(data):
     # header: outlined band, carrier + pass type
     d.rectangle([L, MARGIN, R, MARGIN + 40], outline=BLACK, width=3)
     tf = face("bold", 16)
-    d.text((R - 12, MARGIN + 21), "BOARDING PASS", font=tf, fill=BLACK, anchor="rm")
     roaster = val(data, "roaster").upper() or "SINGLE DOSE"
-    hf, roaster = fit_line(d, roaster, mw - 24 - tw(d, "BOARDING PASS", tf) - 16, 20, 14)
-    d.text((L + 12, MARGIN + 21), roaster, font=hf, fill=BLACK, anchor="lm")
+    hf, short = fit_line(d, roaster, mw - 24 - tw(d, "BOARDING PASS", tf) - 16, 20)
+    if short == roaster:      # roaster fits beside the pass type; otherwise the decorative tag goes
+        d.text((R - 12, MARGIN + 21), "BOARDING PASS", font=tf, fill=BLACK, anchor="rm")
+    else:
+        hf, short = fit_line(d, roaster, mw - 24, 20)
+    d.text((L + 12, MARGIN + 21), short, font=hf, fill=BLACK, anchor="lm")
     y = MARGIN + 40 + 18
 
     # route: ETH ----> VAC
@@ -46,8 +49,9 @@ def render(data):
     # passenger / details
     hr(d, y, w=2); y += 10
     _label(d, L, y, "PASSENGER"); y += 22
-    f, lines, lh = fit_block_face(d, val(data, "coffee_name") or "Coffee", mw, 96, 34, 22,
-                                  "bold", leading=1.1, max_lines=3)
+    sparse = not val(data, "notes")          # no in-flight menu: the name may use that space too
+    f, lines, lh = fit_block_face(d, val(data, "coffee_name") or "Coffee", mw, 150 if sparse else 96, 34, 22,
+                                  "bold", leading=1.1, max_lines=5 if sparse else 3)
     y = draw_lines(d, L, y, lines, f, lh) + 4
 
     # stub geometry (fixed at the bottom)
@@ -78,8 +82,9 @@ def render(data):
     cw = R - cx0
     cy = box_top
     ch = box_h // 2
-    vs = min([fit_line(d, v, cw, 26, 18, "condensed")[0].size for _, v in cells] or [26])
-    for k, v in cells:
+    fits = [fit_short(d, v, cw, 26, style="condensed") for _, v in cells]
+    vs = min([f.size for f, _ in fits] or [26])
+    for (k, _), (_, v) in zip(cells, fits):
         _label(d, cx0, cy + 6, k)
         vf = face("condensed", vs)
         d.text((cx0, cy + ch - 9), ellipsize(d, v, vf, cw), font=vf, fill=BLACK, anchor="ls")
@@ -93,7 +98,7 @@ def render(data):
     if notes and avail >= 44:
         y += 4
         _label(d, L, y, "IN-FLIGHT MENU"); y += 22
-        f3, ls, lh3 = fit_block_face(d, notes, mw, box_top - 14 - y, 22, 17, "regular", leading=1.2)
+        f3, ls, lh3 = fit_block_face(d, notes, mw, box_top - 14 - y, 22, MIN_PX, "regular", leading=1.2)
         y = draw_lines(d, L, y, ls, f3, lh3)
 
     # perforation with punched notches
@@ -111,7 +116,7 @@ def render(data):
         sv = ellipsize(d, seal.upper(), vf, mw - 90)
         d.text((L, y + 22), sv, font=vf, fill=BLACK)
     if dose:
-        df, dd = fit_line(d, dose + "g", 64, 30, 18)
+        df, dd = fit_line(d, dose + "g", 64, 30)
         d.text((R, y + 22), dd, font=df, fill=BLACK, anchor="ra")
     fake_barcode(d, L, y + 62, R - 96, H - MARGIN - 2, seed=batch + dose)
     mf = face("mono_bold", 18)

@@ -9,6 +9,15 @@ FONT_FILE = "/System/Library/Fonts/Helvetica.ttc"
 FALLBACKS = ["/System/Library/Fonts/HelveticaNeue.ttc", "/System/Library/Fonts/Supplemental/Arial.ttf"]
 BLACK, WHITE = 0, 1
 
+# Legibility floors for 203 dpi thermal paper (font size in px; 8 px = 1 mm).
+# Any text that carries information is never set below MIN_PX: when it doesn't fit at the floor it
+# wraps (within the design's line budget), then ellipsizes, or the design drops the field entirely.
+# Short bold caption labels ("SEALED", "Name / Nom") may go down to MIN_CAPTION_PX.
+# Purely decorative strings (MRZ, barcode digits) are exempt but still drawn crisp, never under 15.
+MIN_PX = 18
+MIN_CAPTION_PX = 15
+DOSE_PLACEHOLDER = "\u2014"      # em dash shown in the dose position until a dose is typed
+
 FIELDS = ["roaster", "coffee_name", "origin", "region", "producer", "process",
           "variety", "altitude", "notes", "roast_date", "source_url"]
 
@@ -53,6 +62,11 @@ def fmt_dose(data: dict) -> str:
     return f"{g:g}"
 
 
+def dose_text(data: dict) -> str:
+    """Dose for display: the number, or an em dash placeholder so the layout matches a filled label."""
+    return fmt_dose(data) or DOSE_PLACEHOLDER
+
+
 def today_str() -> str:
     return fmt_date(date.today())
 
@@ -73,7 +87,9 @@ def ellipsize(d, text, f, maxw) -> str:
     return text.rstrip() + "…"
 
 
-def fit_size(d, text, maxw, start, minimum, bold=True) -> int:
+def fit_size(d, text, maxw, start, minimum=MIN_PX, bold=True) -> int:
+    minimum = max(minimum, MIN_PX)
+    start = max(start, minimum)
     s = start
     while s > minimum and tw(d, text, font(s, bold)) > maxw:
         s -= 1
@@ -105,9 +121,11 @@ def wrap(d, text, f, maxw, max_lines=None) -> list[str]:
     return lines
 
 
-def fit_block(d, text, maxw, max_h, start, minimum, bold=True, leading=1.15, max_lines=None):
+def fit_block(d, text, maxw, max_h, start, minimum=MIN_PX, bold=True, leading=1.15, max_lines=None):
     """Largest font size (start..minimum) whose wrapped text fits max_h; returns (font, lines, line_h).
-    At the minimum size, truncates with an ellipsis instead of overflowing."""
+    At the minimum size (never below MIN_PX), truncates with an ellipsis instead of overflowing."""
+    minimum = max(minimum, MIN_PX)
+    start = max(start, minimum)
     for s in range(start, minimum - 1, -1):
         f = font(s, bold)
         lh = int(s * leading)
@@ -139,6 +157,17 @@ def spaced(d, text, x, y, f, spacing=2, center_x=None):
         d.text((x, y), c, font=f, fill=BLACK)
         x += tw(d, c, f) + spacing
     return total
+
+
+def ellipsize_spaced(d, text, f, maxw, spacing=2) -> str:
+    """ellipsize() for spaced(): accounts for the extra letter spacing."""
+    def width(t):
+        return sum(tw(d, c, f) + spacing for c in t) - spacing
+    if width(text) <= maxw:
+        return text
+    while text and width(text.rstrip() + "…") > maxw:
+        text = text[:-1]
+    return text.rstrip() + "…"
 
 
 def hr(d, y, x0=MARGIN, x1=W - MARGIN, w=2):
@@ -178,9 +207,11 @@ def face(style: str, size: int) -> ImageFont.FreeTypeFont:
         return font(size, bold=style not in ("regular", "oblique", "mono"))
 
 
-def fit_line(d, text, maxw, start, minimum, style="bold"):
-    """Largest face(style) size in start..minimum fitting maxw on one line; ellipsizes at minimum.
-    Returns (font, text)."""
+def fit_line(d, text, maxw, start, minimum=MIN_PX, style="bold"):
+    """Largest face(style) size in start..minimum fitting maxw on one line; ellipsizes at minimum
+    (never below MIN_PX). Returns (font, text)."""
+    minimum = max(minimum, MIN_PX)
+    start = max(start, minimum)
     for s in range(start, minimum - 1, -1):
         f = face(style, s)
         if tw(d, text, f) <= maxw:
@@ -189,8 +220,10 @@ def fit_line(d, text, maxw, start, minimum, style="bold"):
     return f, ellipsize(d, text, f, maxw)
 
 
-def fit_block_face(d, text, maxw, max_h, start, minimum, style="bold", leading=1.15, max_lines=None):
-    """fit_block() for any face(style). Returns (font, lines, line_h)."""
+def fit_block_face(d, text, maxw, max_h, start, minimum=MIN_PX, style="bold", leading=1.15, max_lines=None):
+    """fit_block() for any face(style), floored at MIN_PX. Returns (font, lines, line_h)."""
+    minimum = max(minimum, MIN_PX)
+    start = max(start, minimum)
     for s in range(start, minimum - 1, -1):
         f = face(style, s)
         lh = int(s * leading)
@@ -203,6 +236,58 @@ def fit_block_face(d, text, maxw, max_h, start, minimum, style="bold", leading=1
     if max_lines:
         n = min(n, max_lines)
     return f, wrap(d, text, f, maxw, max_lines=n), lh
+
+
+def fits_block_face(d, text, maxw, max_lines, size=MIN_PX, style="bold") -> bool:
+    """True if text wraps into at most max_lines at this size (no ellipsis needed)."""
+    return len(wrap(d, text, face(style, max(size, MIN_PX)), maxw)) <= max_lines
+
+
+def short_forms(text: str) -> list[str]:
+    """Progressively shorter forms of a value with a parenthetical, most informative first:
+    'Washed (TyOxy: oxidation, 48h dry...)' -> 'Washed (TyOxy)' -> 'Washed'."""
+    import re
+    forms = [text]
+    m = re.search(r"\s*\(([^)]*)\)?", text)
+    if m and m.start() > 0:
+        head = re.split(r"[:;,]", m.group(1))[0].strip()
+        if head and head != m.group(1).strip():
+            forms.append(f"{text[:m.start()]} ({head})")
+        forms.append(text[:m.start()].strip())
+    return forms
+
+
+def fit_short(d, text, maxw, start, minimum=MIN_PX, style="bold"):
+    """fit_line() that, rather than ellipsizing at the floor, first tries short_forms() of the text.
+    Returns (font, text)."""
+    for t in short_forms(text):
+        f, out = fit_line(d, t, maxw, start, minimum, style)
+        if out == t:
+            return f, t
+    return fit_line(d, short_forms(text)[-1], maxw, start, minimum, style)
+
+
+def fits_block_face(d, text, maxw, max_lines, size=MIN_PX, style="bold") -> bool:
+    """True if text wraps into at most max_lines at this size (no ellipsis needed)."""
+    return len(wrap(d, text, face(style, max(size, MIN_PX)), maxw)) <= max_lines
+
+
+def fit_parts(d, parts, maxw, max_lines, size=MIN_PX, style="regular", sep=" · "):
+    """Join (text, priority) parts so they wrap into max_lines at `size` (>= MIN_PX): first shorten
+    parentheticals, then drop the lowest-priority parts (highest number). Returns the joined string
+    (the caller still ellipsizes if even the top-priority part alone is too long)."""
+    parts = [(t, p) for t, p in parts if t]
+    while parts:
+        n = max(len(short_forms(t)) for t, _ in parts)
+        for i in range(n):
+            text = sep.join(short_forms(t)[min(i, len(short_forms(t)) - 1)] for t, _ in parts)
+            if fits_block_face(d, text, maxw, max_lines, size, style):
+                return text
+        if len(parts) == 1:
+            return text
+        worst = max(p for _, p in parts)
+        parts = [(t, p) for t, p in parts if p != worst] or parts[:1]
+    return ""
 
 
 def ink_h(d, text, f) -> int:

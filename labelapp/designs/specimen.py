@@ -29,7 +29,7 @@ def render(data):
     _tag(d, TL, T, TR, B)
     L, R = MARGIN + 6, W - MARGIN - 6
     mw = R - L
-    dose = fmt_dose(data)
+    dose = dose_text(data)
 
     # heading row under the punch
     y = T + 56
@@ -58,15 +58,26 @@ def render(data):
             ("OBS.", val(data, "notes"), 3, 20)]
     rows = [r for r in rows if r[1]]
     if len(rows) <= 3:                       # sparse: let a long name take more lines
-        rows[0] = ("SAMPLE", rows[0][1], 4, 26)
+        rows[0] = ("SAMPLE", rows[0][1], 6, 26)
     limit = store_y - 12
-    for i, (k, v, nlines, size) in enumerate(rows):
-        room = limit - y - 6
-        if room < 24:
+
+    def fitted(k, v, nlines, size):
+        style = "regular" if k == "OBS." else "bold"
+        if nlines == 1:                      # one-line slot: shorten a parenthetical before ellipsizing
+            f, t = fit_short(d, v, mw - LW, size, style=style)
+            return f, [t], int(f.size * 1.12)
+        return fit_block_face(d, v, mw - LW, int(size * 1.12) * nlines, size, MIN_PX, style,
+                              leading=1.12, max_lines=nlines)
+
+    # when the form overflows, drop whole low-priority rows instead of squeezing them
+    laid = [(k, fitted(k, v, n, s)) for k, v, n, s in rows]
+    for drop in ("ELEV.", "FARM", "VAR.", "SOURCE", "OBS.", "PREP.", "LOCALE"):
+        if sum(len(ls) * lh + 9 for _, (_, ls, lh) in laid) <= limit - y:
             break
-        bold = k != "OBS."
-        f, ls, lh = fit_block_face(d, v, mw - LW, min(room, int(size * 1.12) * nlines), size,
-                                   17, "bold" if bold else "regular", leading=1.12, max_lines=nlines)
+        laid = [r for r in laid if r[0] != drop]
+    for k, (f, ls, lh) in laid:
+        if y + len(ls) * lh > limit:
+            break
         d.text((L, y + 4), k, font=lf, fill=BLACK)
         yy = draw_lines(d, L + LW, y, ls, f, lh)
         y = yy + 2
@@ -101,6 +112,6 @@ def render(data):
         if i:
             d.rectangle([gx, cy, R, cy + 1], fill=BLACK)
         d.text((gx + 10, cy + 8), k, font=lf, fill=BLACK)
-        vf, v = fit_line(d, v, R - gx - 20, 26, 17, "bold")
+        vf, v = fit_line(d, v, R - gx - 20, 26)
         d.text((gx + 10, cy + ch - 14), v, font=vf, fill=BLACK, anchor="ls")
     return finish(im)

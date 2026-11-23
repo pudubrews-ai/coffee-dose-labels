@@ -12,15 +12,19 @@ def render(data):
     y = MARGIN
     roaster = val(data, "roaster").upper()
     if roaster:
-        f = font(fit_size(d, roaster, mw, 20, 14))
-        spaced(d, ellipsize(d, roaster, f, mw), L, y, f, spacing=2)
+        f = font(fit_size(d, roaster, mw, 20))
+        spaced(d, ellipsize_spaced(d, roaster, f, mw, 2), L, y, f, spacing=2)
         y += 30
-    f, lines, lh = fit_block(d, val(data, "coffee_name") or "Coffee", mw, 90, 38, 24, leading=1.08, max_lines=2)
+    n_rows = sum(1 for k in ("origin", "region", "producer", "process", "variety", "altitude", "notes")
+                 if val(data, k))
+    sparse = n_rows <= 2                     # little else to show: a long name may take 5 lines
+    f, lines, lh = fit_block(d, val(data, "coffee_name") or "Coffee", mw, 160 if sparse else 90, 38, 24,
+                             leading=1.08, max_lines=5 if sparse else 2)
     y = draw_lines(d, L, y, lines, f, lh) + 6
     hr(d, y, w=3); y += 10
 
     # footer box
-    dose = fmt_dose(data)
+    dose = dose_text(data)
     dates = [(k, v) for k, v in (("SEALED", val(data, "seal_date")), ("ROASTED", val(data, "roast_date"))) if v]
     box_h = (66 if dose else 0) + len(dates) * 30 + 20
     box_top = H - MARGIN - box_h
@@ -43,7 +47,7 @@ def render(data):
         d.text((L, y), "NOTES", font=font(16), fill=BLACK); y += 22
         avail = box_top - 12 - y
         if avail >= 22:
-            f3, ls, lh3 = fit_block(d, notes, mw, avail, 24, 17, bold=False, leading=1.18)
+            f3, ls, lh3 = fit_block(d, notes, mw, avail, 24, MIN_PX, bold=False, leading=1.18)
             draw_lines(d, L, y, ls, f3, lh3)
 
     d.rectangle([L, box_top, R, H - MARGIN], outline=BLACK, width=3)
