@@ -36,3 +36,4 @@ button.link{border:0;background:none;color:#e0b080;padding:0 0 0 8px;text-decora
 .status{font-size:13px;display:flex;align-items:center;gap:8px}
 .dot{width:10px;height:10px;border-radius:50%;background:#888}
 .status.ok .dot{background:#4caf50}.status.bad .dot{background:#e5533d}.status.warn .dot{background:#e0a030}
+.drop.disabled{opacity:.5;pointer-events:none}

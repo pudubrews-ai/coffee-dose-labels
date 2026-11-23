@@ -4,3 +4,4 @@ pillow
 bleak
 httpx
 python-multipart
+pillow-heif

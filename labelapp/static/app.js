@@ -39,28 +39,45 @@ async function loadDesigns() {
 }
 
 /* ---- extraction ---- */
+async function errMsg(r, fallback) {
+  try {
+    const j = await r.json();
+    const d = j.error || j.detail;
+    if (typeof d === 'string') return d;
+    if (Array.isArray(d)) return d.map(x => x.msg || JSON.stringify(x)).join('; ');
+    if (d) return JSON.stringify(d);
+  } catch (e) {}
+  return `${fallback} (HTTP ${r.status})`;
+}
+let extracting = false;
+const extractInputs = () => ['#url', '#url-go', '#file', '#cam'].map($);
 async function extract(req) {
+  if (extracting) return;
+  extracting = true;
   show($('#extract-msg'), '');
   $('#busy').hidden = false;
-  ['#url-go'].forEach(s => $(s).disabled = true);
+  extractInputs().forEach(el => el.disabled = true);
+  $('#drop').classList.add('disabled');
   try {
     const r = await req();
+    if (!r.ok) throw new Error(await errMsg(r, 'Extraction failed'));
     const j = await r.json();
-    if (!r.ok) throw new Error(j.error || j.detail || 'Extraction failed');
     FIELDS.forEach(i => { const k = i.dataset.f; if (k in j && k !== 'dose' && k !== 'seal_date') i.value = j[k] || ''; });
-    const n = Object.values(j).filter(Boolean).length;
+    const n = Object.entries(j).filter(([k, v]) => v && k !== 'source_url').length;
     show($('#extract-msg'), `Filled ${n} field(s). Check them before printing.`, 'ok');
     updatePreview();
   } catch (e) {
     show($('#extract-msg'), `${e.message}. You can still fill the fields in by hand.`, 'err');
-  } finally { $('#busy').hidden = true; $('#url-go').disabled = false; }
+  } finally {
+    extracting = false; $('#busy').hidden = true;
+    extractInputs().forEach(el => el.disabled = false); $('#drop').classList.remove('disabled');
+  }
 }
-const doUrl = () => { const u = $('#url').value.trim(); if (u) extract(() => fetch('/api/extract/url', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({url: u})})); };
-const doFile = f => { if (!f) return; const fd = new FormData(); fd.append('file', f); extract(() => fetch('/api/extract/image', {method: 'POST', body: fd})); };
+const doUrl = () => { const u = $('#url').value.trim(); if (u && !extracting) extract(() => fetch('/api/extract/url', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({url: u})})); };
+const doFile = f => { if (!f || extracting) return; const fd = new FormData(); fd.append('file', f); extract(() => fetch('/api/extract/image', {method: 'POST', body: fd})); };
 $('#url-go').onclick = doUrl;
 $('#url').addEventListener('keydown', e => e.key === 'Enter' && doUrl());
 $('#file').onchange = e => { doFile(e.target.files[0]); e.target.value = ''; };
-$('#cam').onchange = e => { doFile(e.target.files[0]); e.target.value = ''; };
 const drop = $('#drop');
 ['dragenter', 'dragover'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('over'); }));
 ['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('over'); }));
@@ -97,8 +114,8 @@ $('#print').onclick = async () => {
     if (p.state === 'connecting' || p.state === 'printing') show(msg, `${p.message} (${p.done}/${p.total} done)`, 'info'); } catch (e) {} }, 700);
   try {
     const r = await fetch('/api/print', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(d)});
+    if (!r.ok) throw new Error(await errMsg(r, 'Print failed'));
     const j = await r.json();
-    if (!r.ok) throw new Error(j.error || j.detail || 'Print failed');
     show(msg, `Printed ${j.printed} label(s). Change the dose to print another batch.`, 'ok');
   } catch (e) { show(msg, e.message, 'err'); }
   finally { clearInterval(poll); printing = false; $('#print').disabled = false; refreshStatus(); }

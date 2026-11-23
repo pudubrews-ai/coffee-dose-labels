@@ -4,7 +4,8 @@ set -e
 cd "$(dirname "$0")"
 PORT=8221
 if [ ! -x .venv/bin/python ]; then
-  PY=$(command -v python3.11 || command -v python3.12 || command -v python3.13 || command -v python3)
+  PY=$(command -v python3.11 || command -v python3.12 || command -v python3.13 || command -v python3 || true)
+  [ -n "$PY" ] || { echo "No python3 found. Install Python 3.11+ (e.g. brew install python@3.12)." >&2; exit 1; }
   "$PY" -m venv .venv
 fi
 if [ ! -f .venv/.deps-stamp ] || [ requirements.txt -nt .venv/.deps-stamp ]; then

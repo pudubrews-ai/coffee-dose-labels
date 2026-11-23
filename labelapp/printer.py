@@ -119,14 +119,22 @@ class Printer:
             s["hot"] = tmp[0] == 0xa9
         return s
 
-    async def status(self) -> dict:
-        if self.printing or self.lock.locked():
-            return {"connected": self.connected, "busy": True, "battery": None,
-                    "paper": None, "hot": None, "error": None}
+    @staticmethod
+    def _no_reply(s: dict) -> bool:
+        return s["battery"] is None and not s["low_battery"] and s["paper"] is None and s["hot"] is None
+
+    async def _status_locked(self) -> dict:
         async with self.lock:
+            if self.printing:
+                return self._busy()
             try:
                 await self.connect()
-                return await self._status_raw()
+                s = await self._status_raw()
+                if self._no_reply(s):          # link looks up but the printer is asleep/gone
+                    await self.disconnect()
+                    return {"connected": False, "error": "Printer not responding. Switch it on and try again.",
+                            "battery": None, "paper": None}
+                return s
             except PrinterError as e:
                 return {"connected": False, "error": str(e), "battery": None, "paper": None}
             except Exception as e:
@@ -134,22 +142,40 @@ class Printer:
                 return {"connected": False, "error": f"{type(e).__name__}: {e}",
                         "battery": None, "paper": None}
 
+    def _busy(self) -> dict:
+        return {"connected": self.connected, "busy": True, "battery": None,
+                "paper": None, "hot": None, "error": None}
+
+    async def status(self) -> dict:
+        if self.printing:
+            return self._busy()
+        t = getattr(self, "_status_task", None)
+        if t is None or t.done():              # concurrent status calls share one in-flight query
+            t = self._status_task = asyncio.ensure_future(self._status_locked())
+        return await asyncio.shield(t)
+
     async def print_image(self, im: Image.Image, copies: int = 1) -> dict:
         data = image_to_raster(im)
         job = build_job(data)
-        if self.lock.locked():
+        if self.printing:
             raise PrinterError("Printer is busy with another job.")
-        async with self.lock:
+        async with self.lock:                  # waits out any in-flight status poll
             self.printing = True
             self.progress = {"state": "connecting", "done": 0, "total": copies, "message": "Connecting..."}
             try:
                 await self.connect()
+                acks, other = 0, []
                 for n in range(copies):
                     st = await self._status_raw()
+                    if n == 0 and st["paper"] is None:      # stale link: reconnect and retry once
+                        await self.disconnect()
+                        await self.connect()
+                        st = await self._status_raw()
                     if st["paper"] is False:
                         raise PrinterError(f"Out of paper after {n} of {copies} labels.")
                     if st["paper"] is None:
-                        raise PrinterError("No paper status reply from printer.")
+                        await self.disconnect()
+                        raise PrinterError("No paper status reply from printer. Check it is on, then retry.")
                     if st["hot"]:
                         raise PrinterError(f"Print head too hot after {n} of {copies} labels.")
                     self.progress.update(state="printing", message=f"Printing {n + 1} of {copies}...")
@@ -158,10 +184,11 @@ class Printer:
                         await self._write(part)
                         await asyncio.sleep(0.1)
                     await asyncio.sleep(COPY_PAUSE if n < copies - 1 else 1.5)
+                    acks += sum(x == b"\x01\x01" for x in self.notes)
+                    other += [x.hex() for x in self.notes if x != b"\x01\x01"]
                     self.progress["done"] = n + 1
                 self.progress.update(state="done", message=f"Printed {copies} label(s).")
-                return {"printed": copies, "notifications": {"acks": sum(n == b"\x01\x01" for n in self.notes),
-                                                          "other": [n.hex() for n in self.notes if n != b"\x01\x01"]}}
+                return {"printed": copies, "notifications": {"acks": acks, "other": other}}
             except PrinterError as e:
                 self.progress.update(state="error", message=str(e)); raise
             except Exception as e:

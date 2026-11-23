@@ -1,8 +1,10 @@
 import io
+import math
 import os
 from contextlib import asynccontextmanager
 from datetime import date
 from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -10,6 +12,7 @@ from . import config as C, designs, extract
 from .designs.common import fmt_date
 from .printer import PrinterError, printer
 
+MAX_UPLOAD = 25_000_000
 STATIC = os.path.join(os.path.dirname(__file__), "static")
 
 
@@ -19,6 +22,7 @@ async def lifespan(app):
     await printer.disconnect()
 
 app = FastAPI(title="Label Printer", lifespan=lifespan)
+app.add_middleware(TrustedHostMiddleware, allowed_hosts=["127.0.0.1", "localhost"])  # blocks DNS rebinding
 
 
 class Label(BaseModel):
@@ -83,7 +87,9 @@ async def extract_url(r: UrlReq):
 
 @app.post("/api/extract/image")
 async def extract_image(file: UploadFile = File(...)):
-    raw = await file.read(25_000_000)
+    raw = await file.read(MAX_UPLOAD + 1)
+    if len(raw) > MAX_UPLOAD:
+        return JSONResponse({"error": "Photo is too large (25 MB max)."}, status_code=413)
     try:
         return await extract.from_image(raw)
     except extract.ExtractError as e:
@@ -94,9 +100,9 @@ async def extract_image(file: UploadFile = File(...)):
 async def print_label(l: Label):
     try:
         dose = float(l.dose or "")
-        if dose <= 0: raise ValueError
+        if not (math.isfinite(dose) and 0 < dose <= 1000): raise ValueError
     except ValueError:
-        raise HTTPException(400, "Dose in grams is required.")
+        raise HTTPException(400, "Dose in grams is required (a number up to 1000).")
     if not 1 <= l.copies <= 50:
         raise HTTPException(400, "Copies must be between 1 and 50.")
     im = render_label(l)
