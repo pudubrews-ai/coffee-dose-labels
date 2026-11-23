@@ -20,13 +20,30 @@ async function updatePreview() {
   const url = URL.createObjectURL(await r.blob());
   const img = $('#preview'); const old = img.src; img.src = url; if (old.startsWith('blob:')) URL.revokeObjectURL(old);
 }
-FIELDS.forEach(i => i.addEventListener('input', schedulePreview));
+/* ---- persisted form state (no messages, no in-flight extraction) ---- */
+const KEY = 'labelForm';
+let sealEdited = false;
+const saved = (() => { try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) { return {}; } })();
+function save() {
+  const o = {copies: $('#copies').value, sealEdited};
+  FIELDS.forEach(i => { if (i.dataset.f !== 'seal_date' || sealEdited) o[i.dataset.f] = i.value; });
+  localStorage.setItem(KEY, JSON.stringify(o));
+}
+FIELDS.forEach(i => { const k = i.dataset.f; if (k in saved && k !== 'seal_date') i.value = saved[k] || ''; });
+if (saved.copies) $('#copies').value = saved.copies;
+if (saved.sealEdited && saved.seal_date) { $('#seal_date').value = saved.seal_date; sealEdited = true; }
+FIELDS.forEach(i => i.addEventListener('input', () => { if (i.dataset.f === 'seal_date') sealEdited = true; save(); schedulePreview(); }));
+$('#copies').addEventListener('input', () => { save(); schedulePreview(); });
+$('#clear').onclick = () => {
+  FIELDS.forEach(i => { if (i.dataset.f !== 'seal_date') i.value = ''; });
+  save(); updatePreview();
+};
 
 /* ---- designs ---- */
 async function loadDesigns() {
   const j = await (await fetch('/api/designs')).json();
   if (!j.designs.some(d => d.id === design)) design = j.designs[0].id;
-  $('#seal_date').value = j.today;
+  if (!sealEdited) $('#seal_date').value = j.today;
   const box = $('#designs'); box.innerHTML = '';
   j.designs.forEach(d => {
     const l = document.createElement('label');
@@ -66,7 +83,7 @@ async function extract(req) {
     FIELDS.forEach(i => { const k = i.dataset.f; if (k in j && k !== 'dose' && k !== 'seal_date') i.value = j[k] || ''; });
     const n = Object.entries(j).filter(([k, v]) => v && k !== 'source_url').length;
     show($('#extract-msg'), `Filled ${n} field(s). Check them before printing.`, 'ok');
-    updatePreview();
+    save(); updatePreview();
   } catch (e) {
     show($('#extract-msg'), `${e.message.replace(/[.\s]+$/, '')}. You can still fill the fields in by hand.`, 'err');
   } finally {

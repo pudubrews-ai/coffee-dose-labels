@@ -98,7 +98,7 @@ def today_str() -> str:
 
 
 def fmt_date(d: date) -> str:
-    return f"{d.day} {d.strftime('%b %Y')}"
+    return f"{d.strftime('%b')} {d.day}, {d.year}"
 
 
 def tw(d, text, f) -> float:
@@ -367,14 +367,15 @@ _MONTHS = ("jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct",
 
 
 def parse_date(s):
-    """'23 Nov 2026', '2026-11-23', '23/11/2026', '23.11.2026', 'November 23, 2026',
+    """'Nov 23, 2026', '23 Nov 2026', '2026-11-23', '11/23/2026' (US M/D first), '23/11/2026', 'November 23, 2026',
     'Roasted on the 23rd of November 2026' -> date, else None (e.g. no year given)."""
     import re
     from datetime import datetime
     if not isinstance(s, str) or not s.strip():
         return None
     t = s.strip()
-    for fmt in ("%d %b %Y", "%Y-%m-%d", "%d %B %Y", "%d/%m/%Y", "%d.%m.%Y", "%B %d, %Y", "%b %d, %Y"):
+    for fmt in ("%b %d, %Y", "%B %d, %Y", "%b %d %Y", "%B %d %Y", "%d %b %Y", "%d %B %Y", "%Y-%m-%d",
+                "%m/%d/%Y", "%m.%d.%Y", "%m-%d-%Y", "%d/%m/%Y", "%d.%m.%Y", "%d-%m-%Y"):
         try:
             return datetime.strptime(t, fmt).date()
         except ValueError:
@@ -393,7 +394,7 @@ def parse_date(s):
 
 
 def normalize(data: dict) -> dict:
-    """Copy of the label data with seal / roast dates in one style ('30 Nov 2026') when they parse
+    """Copy of the label data with seal / roast dates in one style ('Nov 30, 2026') when they parse
     (ISO, 30/11/2026, 'Roasted on the 30th of November 2026'); anything else is left as written."""
     out = dict(data)
     for k in ("seal_date", "roast_date"):

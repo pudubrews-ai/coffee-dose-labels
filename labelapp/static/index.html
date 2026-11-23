@@ -34,24 +34,30 @@
       <label>Variety<input data-f="variety"></label>
       <label>Altitude<input data-f="altitude"></label>
       <label class="wide">Tasting notes<input data-f="notes"></label>
-      <label>Roast date<input data-f="roast_date" placeholder="e.g. 14 Nov 2026"></label>
+      <label>Roast date<input data-f="roast_date" placeholder="e.g. Nov 14, 2026"></label>
       <label>Source URL<input data-f="source_url"></label>
     </div>
   </div>
 </section>
-<section class="col">
+<section class="col side">
   <div class="card">
-    <h2>3. Dose &amp; print</h2>
-    <div class="grid">
-      <label>Dose (g) *<input id="dose" data-f="dose" type="text" inputmode="decimal" autocomplete="off" placeholder="18"></label>
-      <label>Copies<input id="copies" type="number" inputmode="numeric" min="1" max="50" step="1" value="1"></label>
-      <label class="wide">Seal date<input id="seal_date" data-f="seal_date"></label>
+    <h2>3. Dose &amp; print <button id="clear" class="small" title="Clear coffee fields and dose (keeps design)">Clear</button></h2>
+    <div class="pp">
+      <div class="pv">
+        <div class="preview-wrap"><img id="preview" alt="Label preview" width="300" height="480"></div>
+        <div class="cap">Exact 1-bit 400 x 640 image sent to the printer</div>
+      </div>
+      <div class="ctl">
+        <div class="grid">
+          <label>Dose (g) *<input id="dose" data-f="dose" type="text" inputmode="decimal" autocomplete="off" placeholder="18"></label>
+          <label>Copies<input id="copies" type="number" inputmode="numeric" min="1" max="50" step="1" value="1"></label>
+          <label class="wide">Seal date<input id="seal_date" data-f="seal_date"></label>
+        </div>
+        <div class="designs" id="designs"></div>
+        <button id="print" class="primary">Print</button>
+        <div id="print-msg" class="msg" hidden></div>
+      </div>
     </div>
-    <div class="designs" id="designs"></div>
-    <div class="preview-wrap"><img id="preview" alt="Label preview" width="300" height="480"></div>
-    <div class="cap">Exact 1-bit 400 x 640 image sent to the printer</div>
-    <button id="print" class="primary">Print</button>
-    <div id="print-msg" class="msg" hidden></div>
   </div>
 </section>
 </main>

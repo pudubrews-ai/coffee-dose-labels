@@ -8,19 +8,19 @@ from datetime import date
 FULL = dict(roaster="Onyx Coffee Lab", coffee_name="Ethiopia Guji Hambela Natural", origin="Ethiopia",
             region="Guji, Hambela", producer="Kercha Washing Station", process="Natural",
             variety="Heirloom 74110", altitude="2,100 m", notes="Blueberry jam, dark chocolate, jasmine",
-            roast_date="14 Nov 2026", dose="18", seal_date=fmt_date(date(2026, 11, 23)))
+            roast_date="Nov 14, 2026", dose="18", seal_date=fmt_date(date(2026, 11, 23)))
 SPARSE = dict(roaster="", coffee_name="Super Extra Ultra Long Named Single Origin Reserve Lot 47 Anaerobic Honey Experimental Microlot Edition",
-              origin="Colombia", dose="22.5", seal_date="23 Nov 2026")
+              origin="Colombia", dose="22.5", seal_date="Nov 23, 2026")
 MID = dict(roaster="Tim Wendelboe", coffee_name="Kenya Kiambu Karindundu AA", origin="Kenya", region="Kiambu",
            process="Washed", variety="SL28, SL34", notes="Blackcurrant, grapefruit, brown sugar, with a very long tail of extra descriptors to test fit",
-           dose="15", seal_date="23 Nov 2026")
+           dose="15", seal_date="Nov 23, 2026")
 
 # Stress set: very long process and name, no roast date, no dose yet (preview state).
 SEYLONG = dict(roaster="SEY", coffee_name="Pepe Jijon Finca Soledad Mejorado - TyOxy", origin="Ecuador",
                region="Imbabura", producer="Pepe Jijon, Finca Soledad",
                process="Washed (TyOxy: oxidation, 48h dry fermentation, then washed)", variety="Mejorado",
                altitude="1,515 masl", notes="hibiscus, raspberry, tree tomato, fig", roast_date=None, dose="",
-               seal_date="23 Nov 2026")
+               seal_date="Nov 23, 2026")
 # Real coffees as extracted by labelapp.extract (Nov 2026) from 8 roaster pages and a
 # synthetic test bag photo ('photo': Northwind is not a real roaster), dose filled.
 REAL = [
@@ -34,7 +34,7 @@ REAL = [
              'altitude': '1,515 masl',
              'notes': 'Hibiscus, raspberry, tree tomato, fig',
              'dose': '18',
-             'seal_date': '23 Nov 2026'}),
+             'seal_date': 'Nov 23, 2026'}),
     ('onyx', {'roaster': 'Onyx Coffee Lab',
               'coffee_name': 'Jhoan Vergara',
               'origin': 'Colombia',
@@ -44,7 +44,7 @@ REAL = [
               'variety': 'Gesha',
               'altitude': '1,750 meters',
               'dose': '17.5',
-              'seal_date': '23 Nov 2026'}),
+              'seal_date': 'Nov 23, 2026'}),
     ('ccc', {'roaster': 'Counter Culture Coffee',
              'coffee_name': 'Finca Idania',
              'origin': 'El Salvador',
@@ -55,7 +55,7 @@ REAL = [
              'altitude': '1,600–1,700 meters',
              'notes': 'red grape, chocolate, plum',
              'dose': '20',
-             'seal_date': '23 Nov 2026'}),
+             'seal_date': 'Nov 23, 2026'}),
     ('dak', {'roaster': 'Dak Coffee Roasters',
              'coffee_name': 'Peachy Daze',
              'origin': 'Ethiopia',
@@ -66,7 +66,7 @@ REAL = [
              'altitude': '2173 masl',
              'notes': 'Elderflower, Lemon, White Peach, Black Tea',
              'dose': '18',
-             'seal_date': '23 Nov 2026'}),
+             'seal_date': 'Nov 23, 2026'}),
     ('lacabra', {'roaster': 'La Cabra',
                  'coffee_name': 'Concepción',
                  'origin': 'Guatemala',
@@ -77,7 +77,7 @@ REAL = [
                  'altitude': '1770 masl',
                  'notes': 'floral, stone fruit, melon, spiced finish',
                  'dose': '16.5',
-                 'seal_date': '23 Nov 2026'}),
+                 'seal_date': 'Nov 23, 2026'}),
     ('wendelboe', {'roaster': 'Tim Wendelboe Coffee',
                    'coffee_name': 'Los Pirineos',
                    'origin': 'El Salvador',
@@ -88,7 +88,7 @@ REAL = [
                    'altitude': '1100 – 1400 masl',
                    'notes': 'Winey, stone fruits, cacao nibs',
                    'dose': '15',
-                   'seal_date': '23 Nov 2026'}),
+                   'seal_date': 'Nov 23, 2026'}),
     ('populus', {'roaster': 'Populus Coffee',
                  'coffee_name': 'Eudis Orosco',
                  'origin': 'Peru',
@@ -99,7 +99,7 @@ REAL = [
                  'altitude': '2230 masl',
                  'notes': 'aromatic citruses, lemon verbena, white florals, jasmine, lingering sweetness',
                  'dose': '18',
-                 'seal_date': '23 Nov 2026'}),
+                 'seal_date': 'Nov 23, 2026'}),
     ('populus2', {'roaster': 'Populus Coffee',
                   'coffee_name': 'Kamunyaka',
                   'origin': 'Kenya',
@@ -110,7 +110,7 @@ REAL = [
                   'altitude': '1750-1800 masl',
                   'notes': 'dark grapes, sweet citrus, raspberries, black tea, lemonade-like acidity',
                   'dose': '22',
-                  'seal_date': '23 Nov 2026'}),
+                  'seal_date': 'Nov 23, 2026'}),
     ('photo', {'roaster': 'Northwind Coffee Roasters',
                'coffee_name': 'Worka Chelbesa',
                'origin': 'Ethiopia',
@@ -119,9 +119,9 @@ REAL = [
                'variety': 'Heirloom 74158',
                'altitude': '2,050–2,200 masl',
                'notes': 'Peach, bergamot, black tea',
-               'roast_date': '12 Nov 2026',
+               'roast_date': 'Nov 12, 2026',
                'dose': '9',
-               'seal_date': '23 Nov 2026'}),
+               'seal_date': 'Nov 23, 2026'}),
 ]
 SETS = (("full", FULL), ("sparse_long", SPARSE), ("mid", MID), ("seylong", SEYLONG))
 
