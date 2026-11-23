@@ -50,7 +50,7 @@ async function errMsg(r, fallback) {
   return `${fallback} (HTTP ${r.status})`;
 }
 let extracting = false;
-const extractInputs = () => ['#url', '#url-go', '#file', '#cam'].map($);
+const extractInputs = () => ['#url', '#url-go', '#file'].map($).filter(Boolean);
 async function extract(req) {
   if (extracting) return;
   extracting = true;
