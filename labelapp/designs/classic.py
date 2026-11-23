@@ -13,10 +13,11 @@ def render(data):
 
     roaster = val(data, "roaster").upper()
     if roaster:
-        s = fit_size(d, roaster, mw, 22)
-        f = font(s)
-        spaced(d, ellipsize_spaced(d, roaster, f, mw, 3), L, y, f, spacing=3)
-        y += s + 12
+        f, ls, sp = fit_spaced(d, roaster, mw, 22, spacing=3)
+        for ln in ls:
+            spaced(d, ln, L, y, f, spacing=sp)
+            y += round(f.size) + 5
+        y += 7
 
     # bottom block geometry (dose + dates)
     dose = dose_text(data)
@@ -61,15 +62,15 @@ def render(data):
     if dose:
         gf = font(104)
         unit = font(48)
-        gw, uw = tw(d, dose, gf), tw(d, "g", unit)
+        gw, uw = dose_w(d, dose, gf), tw(d, "g", unit)
         if gw + uw + 8 > mw:
-            gf = font(fit_size(d, dose, mw - uw - 8, 104, 40)); gw = tw(d, dose, gf)
-        d.text((L, y - 6), dose, font=gf, fill=BLACK)
+            gf = font(fit_size(d, dose_measure(dose), mw - uw - 8, 104, 40)); gw = dose_w(d, dose, gf)
+        draw_dose(d, (L, y - 6), dose, gf)
         d.text((L + gw + 8, y + 48), "g", font=unit, fill=BLACK)
         y += 110
     for k, v in dates:
         d.text((L, y + 6), k, font=font(20), fill=BLACK)
-        vf = font(28)
-        d.text((R - tw(d, v, vf), y), v, font=vf, fill=BLACK)
+        vf, v = fit_line(d, v, mw - tw(d, k, font(20)) - 16, 28)
+        d.text((R, y + font(28).getmetrics()[0]), v, font=vf, fill=BLACK, anchor="rs")
         y += 30
     return finish(im)

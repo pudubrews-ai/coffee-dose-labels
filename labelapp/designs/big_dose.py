@@ -14,11 +14,11 @@ def render(data):
     # dose (or an em dash placeholder, sized as if it were "18" so the layout doesn't jump)
     unit = font(80)
     uw = tw(d, "g", unit)
-    gf = font(fit_size(d, dose if fmt_dose(data) else "18", mw - uw - 10, 250, 80))
-    gw = tw(d, dose, gf)
+    gf = font(fit_size(d, dose_measure(dose), mw - uw - 10, 250, 80))
+    gw = dose_w(d, dose, gf)
     x0 = cx - (gw + uw + 10) / 2
     base = y + 6 + ink_h(d, "0", gf)                 # baseline from digit cap height, not the glyph
-    d.text((x0, base), dose, font=gf, fill=BLACK, anchor="ls")
+    draw_dose(d, (x0, base), dose, gf, anchor="ls")
     g_desc = d.textbbox((0, 0), "g", font=unit, anchor="ls")[3]
     d.text((x0 + gw + 10, base - g_desc), "g", font=unit, fill=BLACK, anchor="ls")
     y = base + 24
@@ -45,6 +45,13 @@ def render(data):
             f3, ls, lh3 = fit_block(d, og, mw, min(room * 30, limit - y), 24, bold=False, leading=1.2,
                                     max_lines=room)
             y = draw_lines(d, 0, y, ls, f3, lh3, anchor="c", cx=cx)
+    # tasting notes fill the space between the details and the dates, when there is room
+    notes = val(data, "notes")
+    if notes and limit - y >= 44:
+        y += 14
+        f4, ls, lh4 = fit_block_face(d, notes, mw, min(3 * 29, limit - y), 24, MIN_PX, "oblique",
+                                     leading=1.2, max_lines=3)
+        draw_lines(d, 0, y, ls, f4, lh4, anchor="c", cx=cx)
 
     if rows:
         top = foot_top
@@ -52,7 +59,7 @@ def render(data):
         yy = top + 14
         for k, v in rows:
             d.text((L, yy + 6), k, font=font(20), fill=BLACK)
-            vf = font(30)
-            d.text((R - tw(d, v, vf), yy), v, font=vf, fill=BLACK)
+            vf, v = fit_line(d, v, mw - tw(d, k, font(20)) - 16, 30)
+            d.text((R, yy + font(30).getmetrics()[0]), v, font=vf, fill=BLACK, anchor="rs")
             yy += 40
     return finish(im)

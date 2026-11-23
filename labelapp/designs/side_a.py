@@ -26,8 +26,8 @@ def _record(im, d, cx, cy, r, label_r, tracks, dose):
     ring(d, cx, cy + 12, 6, w=2)
     if dose:
         maxw = 2 * math.sqrt(max(1, (label_r - 12) ** 2 - 46 ** 2))
-        gf, txt = fit_line(d, dose, maxw, 64, 28, "condensed")
-        d.text((cx, cy - 2), txt, font=gf, fill=BLACK, anchor="ms")
+        gf, _ = fit_line(d, dose_measure(dose), maxw, 64, 28, "condensed")
+        draw_dose(d, (cx, cy - 2), dose, gf, anchor="ms")
     d.text((cx, cy + 26), "GRAMS", font=face("bold", 16), fill=BLACK, anchor="ma")
 
 
@@ -57,8 +57,8 @@ def render(data):
     yy = foot_top + 12
     for k, v in dates:
         d.text((L, yy + 6), k, font=font(18), fill=BLACK)
-        vf = font(26)
-        d.text((R - tw(d, v, vf), yy), v, font=vf, fill=BLACK)
+        vf, v = fit_line(d, v, mw - tw(d, k, font(18)) - 16, 26)
+        d.text((R, yy + font(26).getmetrics()[0]), v, font=vf, fill=BLACK, anchor="rs")
         yy += 30
 
     # title / artist
@@ -86,7 +86,7 @@ def render(data):
         y += 4
     # liner credits: origin, process, variety, altitude
     # (shorten the process first, then drop altitude, variety, process; never below MIN_PX)
-    room = min(2, (bottom - y) // int(MIN_PX * 1.15))
+    room = max(0, min(2, (bottom - y) // int(MIN_PX * 1.15)))
     credits = fit_parts(d, [(val(data, "origin"), 0), (val(data, "process"), 1),
                             (val(data, "variety"), 2), (val(data, "altitude"), 3)],
                         mw, max(room, 1), MIN_PX, "oblique")

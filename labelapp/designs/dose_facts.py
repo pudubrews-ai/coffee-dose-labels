@@ -49,7 +49,7 @@ def render(data):
 
     # serving size + dates
     sf = face("bold", 22)
-    for k, v in (("Serving size", f"1 dose ({dose}g)" if dose else "1 dose"),
+    for k, v in (("Serving size", "1 dose" if dose == DOSE_PLACEHOLDER else f"1 dose ({dose} g)"),
                  ("Sealed", val(data, "seal_date")), ("Roasted", val(data, "roast_date"))):
         if not v:
             continue
@@ -64,11 +64,11 @@ def render(data):
     d.text((L, y), "Amount per serving", font=face("bold", 16), fill=BLACK)
     gf = face("condensed_black", 76)
     if dose:
-        gf, _ = fit_line(d, dose, mw - 130, 76, 40, "condensed_black")
+        gf, _ = fit_line(d, dose_measure(dose), mw - 130, 76, 40, "condensed_black")
     base = y + 20 + ink_h(d, "0", gf)
     d.text((L, base), "Grams", font=face("condensed_black", 44), fill=BLACK, anchor="ls")
     if dose:
-        d.text((R, base), dose, font=gf, fill=BLACK, anchor="rs")
+        draw_dose(d, (R, base), dose, gf, anchor="rs")
     y = base + 8
     d.rectangle([L, y, R, y + 4], fill=BLACK); y += 8
 

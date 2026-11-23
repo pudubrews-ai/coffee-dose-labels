@@ -12,9 +12,11 @@ def render(data):
     y = MARGIN
     roaster = val(data, "roaster").upper()
     if roaster:
-        f = font(fit_size(d, roaster, mw, 20))
-        spaced(d, ellipsize_spaced(d, roaster, f, mw, 2), L, y, f, spacing=2)
-        y += 30
+        f, ls, sp = fit_spaced(d, roaster, mw, 20, spacing=2)
+        for ln in ls:
+            spaced(d, ln, L, y, f, spacing=sp)
+            y += round(f.size) + 5
+        y += 30 - round(f.size) - 5
     n_rows = sum(1 for k in ("origin", "region", "producer", "process", "variety", "altitude", "notes")
                  if val(data, k))
     sparse = n_rows <= 2                     # little else to show: a long name may take 5 lines
@@ -41,8 +43,7 @@ def render(data):
         d.text((L, y + 5), k, font=font(16), fill=BLACK)
         draw_lines(d, L + LW, y, ls, vf, 28)
         y += len(ls) * 28 + 6
-        d.rectangle([L, y - 3, R, y - 3], fill=BLACK) if False else None
-    if notes:
+    if notes and box_top - 12 - (y + 26) >= 22:      # caption only when a line of notes fits under it
         y += 4
         d.text((L, y), "NOTES", font=font(16), fill=BLACK); y += 22
         avail = box_top - 12 - y
@@ -54,12 +55,12 @@ def render(data):
     y = box_top + 12
     if dose:
         gf = font(56)
-        d.text((L + 12, y - 4), dose, font=gf, fill=BLACK)
-        d.text((L + 12 + tw(d, dose, gf) + 6, y + 22), "g", font=font(30), fill=BLACK)
+        draw_dose(d, (L + 12, y - 4), dose, gf)
+        d.text((L + 12 + dose_w(d, dose, gf) + 6, y + 22), "g", font=font(30), fill=BLACK)
         y += 64
     for k, v in dates:
         d.text((L + 12, y + 5), k, font=font(16), fill=BLACK)
-        vf2 = font(24)
-        d.text((R - 12 - tw(d, v, vf2), y), v, font=vf2, fill=BLACK)
+        vf2, v = fit_line(d, v, mw - 24 - tw(d, k, font(16)) - 14, 24)
+        d.text((R - 12, y + font(24).getmetrics()[0]), v, font=vf2, fill=BLACK, anchor="rs")
         y += 30
     return finish(im)

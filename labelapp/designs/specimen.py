@@ -100,10 +100,10 @@ def render(data):
     d.text((L + 10, grid_top + 8), "DOSE", font=lf, fill=BLACK)
     if dose:
         uf = face("bold", 34)
-        gf, txt = fit_line(d, dose, gx - L - 20 - tw(d, "g", uf) - 4, 84, 40, "condensed")
+        gf, _ = fit_line(d, dose_measure(dose), gx - L - 20 - tw(d, "g", uf) - 4, 84, 40, "condensed")
         base = grid_top + grid_h - 16
-        d.text((L + 10, base), txt, font=gf, fill=BLACK, anchor="ls")
-        d.text((L + 10 + tw(d, txt, gf) + 4, base), "g", font=uf, fill=BLACK, anchor="ls")
+        draw_dose(d, (L + 10, base), dose, gf, anchor="ls")
+        d.text((L + 10 + dose_w(d, dose, gf) + 4, base), "g", font=uf, fill=BLACK, anchor="ls")
     cells = [("SEALED", val(data, "seal_date")), ("ROASTED", val(data, "roast_date"))]
     cells = [c for c in cells if c[1]]
     ch = grid_h // max(1, len(cells))

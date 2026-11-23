@@ -28,4 +28,5 @@ def render(design_id: str, data: dict):
     reg = registry()
     if design_id not in reg:
         raise KeyError(design_id)
-    return reg[design_id].render(data)
+    from .common import normalize
+    return reg[design_id].render(normalize(data))

@@ -67,13 +67,13 @@ def render(data):
     if dose:
         gf = face("condensed", 80)
         uf = face("bold", 36)
-        gw, uw = tw(d, dose, gf), tw(d, "g", uf)
+        gw, uw = dose_w(d, dose, gf), tw(d, "g", uf)
         if gw + uw + 6 > seat_w - 24:
-            gf, _ = fit_line(d, dose, seat_w - 30 - uw, 88, 40, "condensed")
-            gw = tw(d, dose, gf)
+            gf, _ = fit_line(d, dose_measure(dose), seat_w - 30 - uw, 88, 40, "condensed")
+            gw = dose_w(d, dose, gf)
         bx = L + 12
         bb = grid_bottom - 16
-        d.text((bx, bb), dose, font=gf, fill=BLACK, anchor="ls")
+        draw_dose(d, (bx, bb), dose, gf, anchor="ls")
         d.text((bx + gw + 6, bb), "g", font=uf, fill=BLACK, anchor="ls")
 
     cells = [(k, v) for k, v in (("CLASS", val(data, "process")), ("TYPE", val(data, "variety")),
@@ -115,8 +115,8 @@ def render(data):
     if seal:
         sv = ellipsize(d, seal.upper(), vf, mw - 90)
         d.text((L, y + 22), sv, font=vf, fill=BLACK)
-    if dose:
-        df, dd = fit_line(d, dose + "g", 64, 30)
+    if dose != DOSE_PLACEHOLDER:
+        df, dd = fit_line(d, dose + " g", 64, 30)
         d.text((R, y + 22), dd, font=df, fill=BLACK, anchor="ra")
     fake_barcode(d, L, y + 62, R - 96, H - MARGIN - 2, seed=batch + dose)
     mf = face("mono_bold", 18)

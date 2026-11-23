@@ -1,4 +1,5 @@
 """Shared helpers for label designs. All drawing is strictly 1-bit (no anti-aliasing)."""
+import math
 from datetime import date
 from functools import lru_cache
 from PIL import Image, ImageDraw, ImageFont
@@ -16,7 +17,8 @@ BLACK, WHITE = 0, 1
 # Purely decorative strings (MRZ, barcode digits) are exempt but still drawn crisp, never under 15.
 MIN_PX = 18
 MIN_CAPTION_PX = 15
-DOSE_PLACEHOLDER = "\u2014"      # em dash shown in the dose position until a dose is typed
+DOSE_PLACEHOLDER = "\u2014"      # sentinel for "no dose yet"; never drawn as a glyph (see draw_dose)
+DOSE_SAMPLE = "18"               # the blank dose is laid out as if it were this number
 
 FIELDS = ["roaster", "coffee_name", "origin", "region", "producer", "process",
           "variety", "altitude", "notes", "roast_date", "source_url"]
@@ -55,16 +57,40 @@ def join(*parts, sep=" · ") -> str:
 
 
 def fmt_dose(data: dict) -> str:
+    """'17.5', '18' (never '18.0'); accepts a decimal comma. '' unless 0 < dose <= 1000 g."""
     try:
-        g = float(data.get("dose"))
+        g = float(str(data.get("dose")).strip().replace(",", "."))
     except (TypeError, ValueError):
         return ""
-    return f"{g:g}"
+    if not (math.isfinite(g) and 0 < g <= 1000):
+        return ""
+    return f"{round(g, 2):g}"
 
 
 def dose_text(data: dict) -> str:
-    """Dose for display: the number, or an em dash placeholder so the layout matches a filled label."""
+    """Dose for display: the number, or DOSE_PLACEHOLDER (drawn by draw_dose as a light blank)."""
     return fmt_dose(data) or DOSE_PLACEHOLDER
+
+
+def dose_measure(dose: str) -> str:
+    """The string to measure/fit the dose with: the blank is sized like DOSE_SAMPLE."""
+    return DOSE_SAMPLE if dose == DOSE_PLACEHOLDER else dose
+
+
+def dose_w(d, dose, f) -> float:
+    return tw(d, dose_measure(dose), f)
+
+
+def draw_dose(d, xy, dose, f, anchor="la"):
+    """Draw the dose number. With no dose yet, draw a light dashed fill-in rule exactly where the
+    digits of DOSE_SAMPLE would sit (on their baseline), so a unit placed after dose_w() lines up
+    as it will on the printed label, without a heavy black bar."""
+    if dose != DOSE_PLACEHOLDER:
+        d.text(xy, dose, font=f, fill=BLACK, anchor=anchor)
+        return
+    x0, _, x1, y1 = d.textbbox(xy, DOSE_SAMPLE, font=f, anchor=anchor)
+    t = max(2, round(f.size / 48))
+    dashed_h(d, y1 - t, x0, x1, dash=max(6, round(f.size / 7)), gap=max(4, round(f.size / 12)), w=t)
 
 
 def today_str() -> str:
@@ -114,7 +140,8 @@ def wrap(d, text, f, maxw, max_lines=None) -> list[str]:
             lines.append(cur); cur = w
     if cur:
         lines.append(cur)
-    if max_lines and len(lines) > max_lines:
+    if max_lines is not None and len(lines) > max(1, int(max_lines)):
+        max_lines = max(1, int(max_lines))
         keep = lines[:max_lines]
         keep[-1] = ellipsize(d, keep[-1] + " " + " ".join(lines[max_lines:]), f, maxw)
         lines = keep
@@ -134,7 +161,7 @@ def fit_block(d, text, maxw, max_h, start, minimum=MIN_PX, bold=True, leading=1.
             return f, lines, lh
     f = font(minimum, bold)
     lh = int(minimum * leading)
-    n = max(1, max_h // lh)
+    n = max(1, int(max_h // lh))
     if max_lines:
         n = min(n, max_lines)
     return f, wrap(d, text, f, maxw, max_lines=n), lh
@@ -168,6 +195,33 @@ def ellipsize_spaced(d, text, f, maxw, spacing=2) -> str:
     while text and width(text.rstrip() + "…") > maxw:
         text = text[:-1]
     return text.rstrip() + "…"
+
+
+def fit_spaced(d, text, maxw, start, spacing=2, max_lines=2, style="bold"):
+    """Letter-spaced caps line for a roaster name: the largest size start..MIN_PX that fits one line;
+    then tighter letter spacing at MIN_PX; then up to max_lines wrapped lines (last one ellipsized).
+    Returns (font, lines, spacing). Draw each line with spaced()."""
+    def width(t, f, sp):
+        return sum(tw(d, c, f) + sp for c in t) - sp
+    for s in range(max(start, MIN_PX), MIN_PX - 1, -1):
+        f = face(style, s)
+        if width(text, f, spacing) <= maxw:
+            return f, [text], spacing
+    f = face(style, MIN_PX)
+    for sp in range(spacing - 1, -1, -1):
+        if width(text, f, sp) <= maxw:
+            return f, [text], sp
+    lines, cur = [], ""
+    for w in text.split():
+        t = f"{cur} {w}".strip()
+        if not cur or width(t, f, spacing) <= maxw:
+            cur = t
+        else:
+            lines.append(cur); cur = w
+    lines.append(cur)
+    if len(lines) > max_lines:
+        lines = lines[:max_lines - 1] + [" ".join(lines[max_lines - 1:])]
+    return f, [ellipsize_spaced(d, ln, f, maxw, spacing) for ln in lines], spacing
 
 
 def hr(d, y, x0=MARGIN, x1=W - MARGIN, w=2):
@@ -232,7 +286,7 @@ def fit_block_face(d, text, maxw, max_h, start, minimum=MIN_PX, style="bold", le
             return f, lines, lh
     f = face(style, minimum)
     lh = int(minimum * leading)
-    n = max(1, max_h // lh)
+    n = max(1, int(max_h // lh))
     if max_lines:
         n = min(n, max_lines)
     return f, wrap(d, text, f, maxw, max_lines=n), lh
@@ -250,7 +304,7 @@ def short_forms(text: str) -> list[str]:
     forms = [text]
     m = re.search(r"\s*\(([^)]*)\)?", text)
     if m and m.start() > 0:
-        head = re.split(r"[:;,]", m.group(1))[0].strip()
+        head = re.split(r"[:;]|,(?!\d)", m.group(1))[0].strip()
         if head and head != m.group(1).strip():
             forms.append(f"{text[:m.start()]} ({head})")
         forms.append(text[:m.start()].strip())
@@ -265,11 +319,6 @@ def fit_short(d, text, maxw, start, minimum=MIN_PX, style="bold"):
         if out == t:
             return f, t
     return fit_line(d, short_forms(text)[-1], maxw, start, minimum, style)
-
-
-def fits_block_face(d, text, maxw, max_lines, size=MIN_PX, style="bold") -> bool:
-    """True if text wraps into at most max_lines at this size (no ellipsis needed)."""
-    return len(wrap(d, text, face(style, max(size, MIN_PX)), maxw)) <= max_lines
 
 
 def fit_parts(d, parts, maxw, max_lines, size=MIN_PX, style="regular", sep=" · "):
@@ -297,14 +346,14 @@ def ink_h(d, text, f) -> int:
 
 
 def dashed_h(d, y, x0, x1, dash=8, gap=6, w=2):
-    x = x0
+    x, x1, y = round(x0), round(x1), round(y)
     while x < x1:
         d.rectangle([x, y, min(x + dash, x1) - 1, y + w - 1], fill=BLACK)
         x += dash + gap
 
 
 def dashed_v(d, x, y0, y1, dash=8, gap=6, w=2):
-    y = y0
+    y, y1, x = round(y0), round(y1), round(x)
     while y < y1:
         d.rectangle([x, y, x + w - 1, min(y + dash, y1) - 1], fill=BLACK)
         y += dash + gap
@@ -314,15 +363,44 @@ def ring(d, cx, cy, r, w=2):
     d.ellipse([cx - r, cy - r, cx + r, cy + r], outline=BLACK, width=w)
 
 
+_MONTHS = ("jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec")
+
+
 def parse_date(s):
-    """'23 Nov 2026' (fmt_date) or ISO '2026-11-23' -> date, else None."""
+    """'23 Nov 2026', '2026-11-23', '23/11/2026', '23.11.2026', 'November 23, 2026',
+    'Roasted on the 23rd of November 2026' -> date, else None (e.g. no year given)."""
+    import re
     from datetime import datetime
-    for fmt in ("%d %b %Y", "%Y-%m-%d", "%d %B %Y", "%d/%m/%Y"):
+    if not isinstance(s, str) or not s.strip():
+        return None
+    t = s.strip()
+    for fmt in ("%d %b %Y", "%Y-%m-%d", "%d %B %Y", "%d/%m/%Y", "%d.%m.%Y", "%B %d, %Y", "%b %d, %Y"):
         try:
-            return datetime.strptime(s.strip(), fmt).date()
-        except (ValueError, AttributeError):
+            return datetime.strptime(t, fmt).date()
+        except ValueError:
             continue
+    low = t.lower()
+    y = re.findall(r"\b(20\d\d)\b", low)
+    m = re.findall(r"\b(" + "|".join(_MONTHS) + r")[a-z]*\.?(?=[\s,\d]|$)", low)
+    rest = re.sub(r"\b20\d\d\b", " ", low)
+    dd = re.findall(r"\b(\d{1,2})(?:st|nd|rd|th)?\b", rest)
+    if len(y) == 1 and len(m) == 1 and len(dd) == 1:
+        try:
+            return date(int(y[0]), _MONTHS.index(m[0]) + 1, int(dd[0]))
+        except ValueError:
+            return None
     return None
+
+
+def normalize(data: dict) -> dict:
+    """Copy of the label data with seal / roast dates in one style ('30 Nov 2026') when they parse
+    (ISO, 30/11/2026, 'Roasted on the 30th of November 2026'); anything else is left as written."""
+    out = dict(data)
+    for k in ("seal_date", "roast_date"):
+        dt = parse_date(val(out, k))
+        if dt:
+            out[k] = fmt_date(dt)
+    return out
 
 
 def batch_code(data: dict) -> str:

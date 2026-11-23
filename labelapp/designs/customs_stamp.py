@@ -67,8 +67,12 @@ def _dose_stamp(dose, w=168, h=124):
     d.rectangle(hs.p(12, 12, w - 12, h - 12), outline=0, width=2 * s)
     d.text((w / 2 * s, 22 * s), "ADMITTED · DOSE", font=hs.font("bold", 15), fill=0, anchor="ma")
     if dose:
-        gf, _ = fit_line(_M, dose + " g", w - 40, 64, 30, "condensed")
-        d.text((w / 2 * s, (h - 22) * s), dose + " g", font=hs.font("condensed", gf.size), fill=0, anchor="ms")
+        gf, _ = fit_line(_M, dose_measure(dose) + " g", w - 40, 64, 30, "condensed")
+        f = hs.font("condensed", gf.size)
+        x = w / 2 * s - d.textlength(dose_measure(dose) + " g", font=f) / 2
+        base = (h - 22) * s
+        draw_dose(d, (x, base), dose, f, anchor="ls")
+        d.text((x + d.textlength(dose_measure(dose) + " ", font=f), base), "g", font=f, fill=0, anchor="ls")
     return hs.to_1bit(angle=-6)
 
 

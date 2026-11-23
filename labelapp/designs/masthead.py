@@ -51,10 +51,10 @@ def render(data):
             y_b -= 24
     if dose:
         uf = face("condensed", 52)
-        gf, _ = fit_line(d, dose, mw - tw(d, "g", uf) - 6, 128, 48, "condensed")
+        gf, _ = fit_line(d, dose_measure(dose), mw - tw(d, "g", uf) - 6, 128, 48, "condensed")
         base = y_b - 4
-        d.text((L - 3, base), dose, font=gf, fill=BLACK, anchor="ls")
-        d.text((L - 3 + tw(d, dose, gf) + 4, base), "g", font=uf, fill=BLACK, anchor="ls")
+        draw_dose(d, (L - 3, base), dose, gf, anchor="ls")
+        d.text((L - 3 + dose_w(d, dose, gf) + 4, base), "g", font=uf, fill=BLACK, anchor="ls")
         y_b = base - ink_h(d, "0", gf) - 14
     hr(d, y_b, L, R, w=3)
     limit = y_b - 14
@@ -63,9 +63,11 @@ def render(data):
     y = T
     roaster = val(data, "roaster").upper()
     if roaster:
-        rf, roaster = fit_line(d, roaster, mw, MIN_PX)
-        spaced(d, ellipsize_spaced(d, roaster, rf, mw, 2), L, y, rf, spacing=2)
-        y += 30
+        rf, ls, sp = fit_spaced(d, roaster, mw, MIN_PX, spacing=2)
+        for ln in ls:
+            spaced(d, ln, L, y, rf, spacing=sp)
+            y += round(rf.size) + 5
+        y += 30 - round(rf.size) - 5
     details = [val(data, "region"), val(data, "producer"), val(data, "process"),
                val(data, "variety"), val(data, "altitude")]
     sparse = not any(details) and not val(data, "notes")
