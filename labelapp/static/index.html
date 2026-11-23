@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Bean Dose Labels</title>
+<link rel="stylesheet" href="/static/app.css">
+</head><body>
+<header>
+  <h1>Bean dose labels</h1>
+  <div id="status" class="status"><span class="dot"></span><span id="status-text">Checking printer...</span>
+    <button id="status-refresh" class="link" title="Re-check printer">refresh</button></div>
+</header>
+<main>
+<section class="col">
+  <div class="card">
+    <h2>1. Load the coffee</h2>
+    <div class="row"><input id="url" type="url" placeholder="Paste roaster product URL">
+      <button id="url-go">Extract</button></div>
+    <div id="drop" class="drop">
+      <span>Drop a photo of the bag here, or</span>
+      <label class="btn-like">Choose photo<input id="file" type="file" accept="image/*" hidden></label>
+      <label class="btn-like">Take photo<input id="cam" type="file" accept="image/*" capture="environment" hidden></label>
+    </div>
+    <div id="busy" class="busy" hidden><span class="spin"></span> Reading the coffee details... this can take 10-30 s</div>
+    <div id="extract-msg" class="msg" hidden></div>
+  </div>
+  <div class="card">
+    <h2>2. Details <span class="hint">edit anything</span></h2>
+    <div class="grid">
+      <label>Roaster<input data-f="roaster"></label>
+      <label>Coffee name<input data-f="coffee_name"></label>
+      <label>Origin country<input data-f="origin"></label>
+      <label>Region<input data-f="region"></label>
+      <label>Producer / farm<input data-f="producer"></label>
+      <label>Process<input data-f="process"></label>
+      <label>Variety<input data-f="variety"></label>
+      <label>Altitude<input data-f="altitude"></label>
+      <label class="wide">Tasting notes<input data-f="notes"></label>
+      <label>Roast date<input data-f="roast_date" placeholder="e.g. 14 Nov 2026"></label>
+      <label>Source URL<input data-f="source_url"></label>
+    </div>
+  </div>
+</section>
+<section class="col">
+  <div class="card">
+    <h2>3. Dose &amp; print</h2>
+    <div class="grid">
+      <label>Dose (g) *<input id="dose" data-f="dose" type="number" inputmode="decimal" step="0.1" min="0" placeholder="18"></label>
+      <label>Copies<input id="copies" type="number" min="1" max="50" value="1"></label>
+      <label class="wide">Seal date<input id="seal_date" data-f="seal_date"></label>
+    </div>
+    <div class="designs" id="designs"></div>
+    <div class="preview-wrap"><img id="preview" alt="Label preview" width="300" height="480"></div>
+    <div class="cap">Exact 1-bit 400 x 640 image sent to the printer</div>
+    <button id="print" class="primary">Print</button>
+    <div id="print-msg" class="msg" hidden></div>
+  </div>
+</section>
+</main>
+<script src="/static/app.js"></script>
+</body></html>
