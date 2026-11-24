@@ -6,7 +6,7 @@ Local web app that prints 50x80 mm labels for vacuum-sealed coffee doses on a Ph
 ```
 ./run.sh        # creates .venv, installs deps, serves http://127.0.0.1:8221 and opens the browser
 ```
-Launch it from a terminal that has Bluetooth permission (e.g. Warp). On a new Mac: turn the printer on, then grant the terminal app access in System Settings → Privacy & Security → Bluetooth (macOS asks on the first scan; if it doesn't, add the app there and relaunch it). No pairing in the Bluetooth menu is needed — pick the printer in the app's Printer dropdown. Auto-fill extraction needs the `claude` CLI signed in (no API keys); without it the app still works and the extraction box is replaced by a note. Set `LABELAPP_NO_CLAUDE=1` to simulate that for testing.
+Launch it from a terminal that has Bluetooth permission (e.g. Warp). On a new Mac: turn the printer on, then grant the terminal app access in System Settings → Privacy & Security → Bluetooth (macOS asks on the first scan; if it doesn't, add the app there and relaunch it). Pick the printer in the app's Printer dropdown. Pairing it in the macOS Bluetooth menu should not be needed (untested on a fresh Mac); if status stays blank, pair it there and retry. Auto-fill extraction needs the `claude` CLI signed in (no API keys); without it the app still works and the extraction box is replaced by a note. Set `LABELAPP_NO_CLAUDE=1` to simulate that for testing.
 
 ## How it works
 1. Paste a roaster URL (page is fetched by the backend, reduced to text/meta/JSON-LD, then passed to `claude -p`) or drop/take a photo of the bag (`claude -p` with only the `Read` tool on a downscaled copy). Page and image text are treated as untrusted data. Results fill editable fields; manual entry always works.
