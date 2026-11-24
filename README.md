@@ -13,12 +13,12 @@ A small web app that runs on your Mac and prints labels for vacuum-sealed coffee
 
 ## Install
 
-1. Get the code (the repo is private, so use an account with access):
+1. Get the code:
    ```
-   gh repo clone pudubrews-ai/coffee-dose-labels
+   git clone https://github.com/pudubrews-ai/coffee-dose-labels.git
    cd coffee-dose-labels
    ```
-   or `git clone https://github.com/pudubrews-ai/coffee-dose-labels.git`.
+   No git? Use **Code → Download ZIP** on the GitHub page and unzip it, then `cd` into the folder.
 2. Turn the printer on.
 3. Start the app:
    ```
@@ -54,6 +54,7 @@ Your fields are kept if you refresh the page; **Clear** empties them.
 | "Auto-fill unavailable" | Install Claude Code and run `claude` once to sign in, then restart the app. |
 | Print comes out offset or cropped | The app is built for the M220/M221 with 50 × 80 mm labels only. |
 | `Already running on port 8221` | It is already running; the browser opens to it. |
+| `permission denied: ./run.sh` (e.g. after a ZIP download) | Run `bash run.sh` instead, or `chmod +x run.sh` once. |
 
 ## Technical notes
 
