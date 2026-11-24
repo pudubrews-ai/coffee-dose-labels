@@ -4,7 +4,14 @@ import os
 ADV_SERVICES = ("0000af30-0000-1000-8000-00805f9b34fb", "0000ff00-0000-1000-8000-00805f9b34fb")
 GATT_SERVICE = "0000ff00-0000-1000-8000-00805f9b34fb"
 NAME_PATTERN = r"^(M[012]|Q|D|T0|P12)"   # candidate name prefixes (any name containing "phomemo" also matches)
-STATE_DIR = os.environ.get("LABELAPP_STATE_DIR") or os.path.expanduser("~/Library/Application Support/BeanLabels")
+_SUPPORT = os.path.expanduser("~/Library/Application Support")
+STATE_DIR = os.environ.get("LABELAPP_STATE_DIR") or os.path.join(_SUPPORT, "CoffeeDoseLabels")
+_OLD_STATE_DIR = os.path.join(_SUPPORT, "BeanLabels")   # name used before the rename
+if not os.environ.get("LABELAPP_STATE_DIR") and os.path.isdir(_OLD_STATE_DIR) and not os.path.exists(STATE_DIR):
+    try:
+        os.rename(_OLD_STATE_DIR, STATE_DIR)   # keep the remembered printer
+    except OSError:
+        STATE_DIR = _OLD_STATE_DIR
 STATE_FILE = os.path.join(STATE_DIR, "printer.json")
 WRITE_CHAR = "0000ff02-0000-1000-8000-00805f9b34fb"
 NOTIFY_CHAR = "0000ff03-0000-1000-8000-00805f9b34fb"

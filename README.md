@@ -1,4 +1,4 @@
-# Bean dose labels
+# Coffee Dose Labels
 
 A small web app that runs on your Mac and prints labels for vacuum-sealed coffee doses on a Phomemo thermal label printer. Paste a roaster's product URL or a photo of the bag, enter the dose, pick a design, print.
 
@@ -15,10 +15,10 @@ A small web app that runs on your Mac and prints labels for vacuum-sealed coffee
 
 1. Get the code (the repo is private, so use an account with access):
    ```
-   gh repo clone pudubrews-ai/labelprinter
-   cd labelprinter
+   gh repo clone pudubrews-ai/coffee-dose-labels
+   cd coffee-dose-labels
    ```
-   or `git clone https://github.com/pudubrews-ai/labelprinter.git`.
+   or `git clone https://github.com/pudubrews-ai/coffee-dose-labels.git`.
 2. Turn the printer on.
 3. Start the app:
    ```
@@ -43,7 +43,7 @@ Your fields are kept if you refresh the page; **Clear** empties them.
 
 - Stop: press `Ctrl+C` in the terminal running it.
 - Update: `git pull`, then `./run.sh` (it reinstalls dependencies when they change).
-- Uninstall: delete the folder, and `~/Library/Application Support/BeanLabels` (remembered printer).
+- Uninstall: delete the folder, and `~/Library/Application Support/CoffeeDoseLabels` (remembered printer).
 
 ## Troubleshooting
 
@@ -65,7 +65,7 @@ Your fields are kept if you refresh the page; **Clear** empties them.
 Layout: `labelapp/printer.py` (BLE, CLI: `python -m labelapp.printer status`), `extract.py` (claude CLI), `designs/` (labels), `server.py` (FastAPI), `static/` (UI), `config.py` (port, model, BLE patterns), `capabilities.py` (is Claude available: `claude auth status`, no model call). Samples: `python -m labelapp.samples` writes `docs/samples/`. `prototype/` holds the original probe scripts.
 
 ### Printer facts
-Printers are found by BLE scan (UI: Printer picker + Scan; API: `GET /api/printers`, `POST /api/printer/select {id}`). Candidates advertise service af30/ff00 or a name starting M0/M1/M2/Q/D/T0/P12 or containing "Phomemo"; on connect the device must expose service ff00 with ff02/ff03 or it is rejected as not a compatible Phomemo. The selection is kept in the browser (localStorage) and in `~/Library/Application Support/BeanLabels/printer.json` (override dir with `LABELAPP_STATE_DIR`). Protocol and geometry are the M220/M221 ones (576 px head, 50x80 mm labels); other models may need per-model settings later. Service ff00, write ff02 (no response), notify ff03. Head 576 px / 203 dpi; label 400x640 px centred (88 px blank each side). Job: `1b40; 1b37 07 78 02; 1d7c 05; 1d7630 00 48 00 80 02 + raster; 1b4a 20`. Status: `1f1108` battery, `1f1111` paper (89 = present), `1f1113` head temp.
+Printers are found by BLE scan (UI: Printer picker + Scan; API: `GET /api/printers`, `POST /api/printer/select {id}`). Candidates advertise service af30/ff00 or a name starting M0/M1/M2/Q/D/T0/P12 or containing "Phomemo"; on connect the device must expose service ff00 with ff02/ff03 or it is rejected as not a compatible Phomemo. The selection is kept in the browser (localStorage) and in `~/Library/Application Support/CoffeeDoseLabels/printer.json` (override dir with `LABELAPP_STATE_DIR`). Protocol and geometry are the M220/M221 ones (576 px head, 50x80 mm labels); other models may need per-model settings later. Service ff00, write ff02 (no response), notify ff03. Head 576 px / 203 dpi; label 400x640 px centred (88 px blank each side). Job: `1b40; 1b37 07 78 02; 1d7c 05; 1d7630 00 48 00 80 02 + raster; 1b4a 20`. Status: `1f1108` battery, `1f1111` paper (89 = present), `1f1113` head temp.
 
 ### Adding a design
 Drop a file in `labelapp/designs/` (e.g. `mine.py`); it appears in the picker automatically.
