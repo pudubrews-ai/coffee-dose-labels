@@ -13,7 +13,7 @@ try:
     register_heif_opener()
 except ImportError:
     pass
-from . import config as C
+from . import capabilities, config as C
 
 FIELDS = ["roaster", "coffee_name", "origin", "region", "producer", "process",
           "variety", "altitude", "notes", "roast_date", "source_url"]
@@ -89,7 +89,7 @@ def _parse(stdout: str) -> dict:
 
 async def _claude(prompt: str, allowed: str, cwd: str, timeout=120) -> dict:
     """allowed: '' for no tools, else a single permission rule such as Read(//abs/path)."""
-    args = ["claude", "-p", prompt, "--output-format", "json", "--model", C.CLAUDE_MODEL,
+    args = [capabilities.claude_path(), "-p", prompt, "--output-format", "json", "--model", C.CLAUDE_MODEL,
             "--json-schema", json.dumps(SCHEMA), "--no-session-persistence",
             "--strict-mcp-config", "--setting-sources", "",
             "--tools", "Read" if allowed else "",

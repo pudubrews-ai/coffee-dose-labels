@@ -7,7 +7,7 @@ from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
-from . import config as C, designs, extract
+from . import capabilities, config as C, designs, extract
 from .designs.common import fmt_date, fmt_dose
 from .printer import PrinterError, printer
 
@@ -17,6 +17,7 @@ STATIC = os.path.join(os.path.dirname(__file__), "static")
 
 @asynccontextmanager
 async def lifespan(app):
+    capabilities.start()          # background; never blocks startup or page load
     yield
     await printer.disconnect()
 
@@ -42,6 +43,11 @@ class Label(BaseModel):
     copies: int = 1
 
 
+class PrinterSel(BaseModel):
+    id: str | None = None
+    name: str | None = None
+
+
 class UrlReq(BaseModel):
     url: str
 
@@ -60,7 +66,45 @@ def list_designs():
 
 @app.get("/api/status")
 async def status():
-    return await printer.status()
+    s = await printer.status()
+    s["selected"] = {"id": printer.selected_id, "name": printer.selected_name} if printer.selected_id else None
+    return s
+
+
+@app.get("/api/printers")
+async def printers():
+    try:
+        found = await printer.scan(6.0)
+    except Exception as e:
+        return JSONResponse({"error": f"Bluetooth scan failed ({type(e).__name__}). Is Bluetooth on and allowed for this terminal?"}, status_code=502)
+    return {"printers": found, "selected": printer.selected_id}
+
+
+@app.get("/api/printer")
+def current_printer():
+    return {"id": printer.selected_id, "name": printer.selected_name}
+
+
+@app.post("/api/printer/select")
+async def select_printer(r: PrinterSel):
+    try:
+        await printer.select(r.id, r.name)
+    except PrinterError as e:
+        return JSONResponse({"error": str(e)}, status_code=409)
+    return {"id": printer.selected_id, "name": printer.selected_name}
+
+
+@app.get("/api/capabilities")
+async def caps(refresh: bool = False):
+    return await capabilities.get(refresh)
+
+
+async def require_extract():
+    c = await capabilities.get()
+    if not c["extract"]:
+        c = await capabilities.get(refresh=True)      # cheap; picks up a fresh install or login
+    if not c["extract"]:
+        raise HTTPException(503, capabilities.MESSAGE)
 
 
 @app.get("/api/print/progress")
@@ -78,6 +122,7 @@ def preview(l: Label):
 
 @app.post("/api/extract/url")
 async def extract_url(r: UrlReq):
+    await require_extract()
     try:
         return await extract.from_url(r.url.strip())
     except extract.ExtractError as e:
@@ -86,6 +131,7 @@ async def extract_url(r: UrlReq):
 
 @app.post("/api/extract/image")
 async def extract_image(file: UploadFile = File(...)):
+    await require_extract()
     raw = await file.read(MAX_UPLOAD + 1)
     if len(raw) > MAX_UPLOAD:
         return JSONResponse({"error": "Photo is too large (25 MB max)."}, status_code=413)

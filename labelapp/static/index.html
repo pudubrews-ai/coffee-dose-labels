@@ -9,10 +9,19 @@
   <div id="status" class="status"><span class="dot"></span><span id="status-text">Checking printer...</span>
     <button id="status-refresh" class="link" title="Re-check printer">refresh</button></div>
 </header>
+<div class="picker">
+  <label for="printer-sel">Printer</label>
+  <select id="printer-sel"><option value="">No printer selected</option></select>
+  <button id="scan" class="small-btn">Scan</button>
+  <span id="picker-msg" class="picker-msg"></span>
+  <span class="picker-help">Made for the Phomemo M220/M221 (576 px head, 50x80 mm labels). Other models may need different settings.</span>
+</div>
 <main>
 <section class="col">
   <div class="card">
     <h2>1. Load the coffee</h2>
+    <div id="extract-off" class="note" hidden>Auto-fill unavailable &mdash; Claude Code not found or not signed in. Fill in the fields below.</div>
+    <div id="extract-box" hidden>
     <div class="row"><input id="url" type="url" placeholder="Paste roaster product URL">
       <button id="url-go">Extract</button></div>
     <div id="drop" class="drop">
@@ -21,6 +30,7 @@
     </div>
     <div id="busy" class="busy" hidden><span class="spin"></span> Reading the coffee details... this can take 10-30 s</div>
     <div id="extract-msg" class="msg" hidden></div>
+    </div>
   </div>
   <div class="card">
     <h2>2. Details <span class="hint">edit anything</span></h2>

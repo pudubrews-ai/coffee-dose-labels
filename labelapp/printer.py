@@ -1,5 +1,8 @@
-"""Phomemo M221 BLE driver. CLI: python -m labelapp.printer status | print IMAGE.png"""
+"""Phomemo M220/M221 BLE driver. CLI: python -m labelapp.printer status | print IMAGE.png"""
 import asyncio
+import json
+import os
+import re
 import sys
 from PIL import Image
 from bleak import BleakClient, BleakScanner
@@ -42,6 +45,9 @@ def build_job(data: bytes) -> list[bytes]:
 class Printer:
     def __init__(self):
         self.client: BleakClient | None = None
+        self.selected_id: str | None = None
+        self.selected_name: str | None = None
+        self._load_selection()
         self.notes: list[bytes] = []
         self.lock = asyncio.Lock()      # one job / BLE operation at a time
         self.printing = False
@@ -54,13 +60,59 @@ class Printer:
     def connected(self):
         return bool(self.client and self.client.is_connected)
 
+    def _load_selection(self):
+        try:
+            with open(C.STATE_FILE) as f:
+                j = json.load(f)
+            if isinstance(j.get("id"), str) and j["id"]:
+                self.selected_id, self.selected_name = j["id"], j.get("name")
+        except (OSError, ValueError, AttributeError):
+            pass
+
+    async def select(self, pid: str | None, name: str | None = None):
+        """Choose the printer to use (persisted). Drops any link to a previously selected one."""
+        pid = (pid or "").strip() or None
+        if self.printing:
+            raise PrinterError("Printer is busy with a job. Try again when it finishes.")
+        async with self.lock:
+            if pid != self.selected_id:
+                await self.disconnect()
+            self.selected_id, self.selected_name = pid, name
+        try:
+            os.makedirs(C.STATE_DIR, exist_ok=True)
+            if pid:
+                with open(C.STATE_FILE, "w") as f:
+                    json.dump({"id": pid, "name": name}, f)
+            elif os.path.exists(C.STATE_FILE):
+                os.remove(C.STATE_FILE)
+        except OSError:
+            pass                                   # selection still works for this run
+
+    @staticmethod
+    def is_candidate(name: str | None, services) -> bool:
+        if any(u.lower() in C.ADV_SERVICES for u in services or []):
+            return True
+        return bool(name and (re.match(C.NAME_PATTERN, name) or "phomemo" in name.lower()))
+
+    async def scan(self, timeout: float = 6.0) -> list[dict]:
+        """BLE scan for Phomemo-like devices -> [{id, name, rssi}], strongest first."""
+        found = await BleakScanner.discover(timeout=timeout, return_adv=True)
+        out = {}
+        for addr, (d, adv) in found.items():
+            name = d.name or adv.local_name
+            if self.is_candidate(name, adv.service_uuids):
+                out[addr] = {"id": addr, "name": name or "Unnamed printer", "rssi": adv.rssi}
+        if self.connected and self.selected_id and self.selected_id not in out:
+            # a connected printer stops advertising, so it would vanish from the scan
+            out[self.selected_id] = {"id": self.selected_id, "name": self.selected_name or "Printer", "rssi": None}
+        return sorted(out.values(), key=lambda x: -(x["rssi"] if x["rssi"] is not None else 0))
+
     async def _find(self):
-        def match(d, adv):
-            return (d.name == C.PRINTER_NAME or adv.local_name == C.PRINTER_NAME
-                    or C.PRINTER_SERVICE_UUID in [u.lower() for u in adv.service_uuids])
-        dev = await BleakScanner.find_device_by_filter(match, timeout=12)
+        if not self.selected_id:
+            raise PrinterError("No printer selected. Choose one with Scan.")
+        dev = await BleakScanner.find_device_by_address(self.selected_id, timeout=12)
         if not dev:
-            raise PrinterError("Printer not found. Is it switched on and in range?")
+            raise PrinterError("Selected printer not found. Is it switched on and in range? Try Scan.")
         return dev
 
     async def connect(self):
@@ -71,7 +123,14 @@ class Printer:
         c = BleakClient(dev, timeout=20)
         try:
             await c.connect()
+            chars = {ch.uuid.lower() for sv in c.services if sv.uuid.lower() == C.GATT_SERVICE for ch in sv.characteristics}
+            if C.WRITE_CHAR not in chars or C.NOTIFY_CHAR not in chars:
+                raise PrinterError("This device is not a compatible Phomemo (no ff00 service with ff02/ff03).")
             await c.start_notify(C.NOTIFY_CHAR, self._cb)
+        except PrinterError:
+            try: await c.disconnect()
+            except Exception: pass
+            raise
         except Exception as e:
             try: await c.disconnect()
             except Exception: pass
@@ -206,7 +265,9 @@ printer = Printer()
 async def _cli():
     import json
     cmd = sys.argv[1] if len(sys.argv) > 1 else "status"
-    if cmd == "status":
+    if cmd == "scan":
+        print(json.dumps(await printer.scan(), indent=2))
+    elif cmd == "status":
         print(json.dumps(await printer.status(), indent=2))
     elif cmd == "print":
         im = Image.open(sys.argv[2]).convert("1")

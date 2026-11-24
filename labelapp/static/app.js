@@ -103,12 +103,75 @@ drop.addEventListener('drop', e => doFile(e.dataTransfer.files[0]));
 window.addEventListener('dragover', e => e.preventDefault());
 window.addEventListener('drop', e => e.preventDefault());
 
+/* ---- capabilities (is Claude-based auto-fill available?) ---- */
+async function loadCaps() {
+  let ok = true;
+  try { const r = await fetch('/api/capabilities'); if (r.ok) ok = !!(await r.json()).extract; } catch (e) {}
+  $('#extract-box').hidden = !ok; $('#extract-off').hidden = ok;
+}
+
+/* ---- printer picker ---- */
+const sel = $('#printer-sel'), pmsg = (t, ok) => { $('#picker-msg').textContent = t || ''; $('#picker-msg').className = 'picker-msg' + (ok ? ' ok' : ''); };
+let known = [];
+function renderPrinters(list, selectedId) {
+  const keep = list.slice();
+  const cur = (() => { try { return JSON.parse(localStorage.getItem('printer')); } catch (e) { return null; } })();
+  if (selectedId && !keep.some(p => p.id === selectedId) && cur && cur.id === selectedId) keep.push({id: cur.id, name: cur.name || 'Saved printer', missing: true});
+  sel.innerHTML = '';
+  if (!keep.length) sel.add(new Option('No printer found', ''));
+  else if (!selectedId) sel.add(new Option('Choose a printer...', ''));
+  keep.forEach(p => sel.add(new Option(p.name + (p.missing ? ' (not found)' : ''), p.id)));
+  sel.value = selectedId || '';
+}
+async function choose(id, name) {
+  const r = await fetch('/api/printer/select', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({id, name})});
+  if (!r.ok) { pmsg(await errMsg(r, 'Could not select printer')); return false; }
+  if (id) localStorage.setItem('printer', JSON.stringify({id, name})); else localStorage.removeItem('printer');
+  return true;
+}
+async function scan(auto) {
+  $('#scan').disabled = true; pmsg('Scanning for printers... (about 6 s)', true);
+  try {
+    const r = await fetch('/api/printers');
+    if (!r.ok) { pmsg(await errMsg(r, 'Scan failed')); return; }
+    const j = await r.json(); known = j.printers;
+    let selId = j.selected;
+    if (selId && !known.some(p => p.id === selId)) {
+      pmsg('Your saved printer was not found. Switch it on, then press Scan again, or pick another.');
+    } else if (!selId && known.length === 1) {
+      if (await choose(known[0].id, known[0].name)) { selId = known[0].id; pmsg('Printer selected automatically.', true); }
+    } else if (!known.length) {
+      pmsg('No Phomemo printers found. Switch it on, keep it close, then press Scan.');
+    } else if (!selId) pmsg('Several printers found. Choose yours.', true);
+    else pmsg('', true);
+    renderPrinters(known, selId);
+  } catch (e) { pmsg('Scan failed. Is the server running?'); }
+  finally { $('#scan').disabled = false; refreshStatus(); }
+}
+$('#scan').onclick = () => scan(false);
+sel.onchange = async () => {
+  const p = known.find(x => x.id === sel.value);
+  if (await choose(sel.value || null, p ? p.name : null)) { pmsg('', true); $('#status-text').textContent = 'Checking printer...'; refreshStatus(); }
+};
+async function initPrinter() {
+  let cur = null; try { cur = JSON.parse(localStorage.getItem('printer')); } catch (e) {}
+  try {
+    const srv = await (await fetch('/api/printer')).json();
+    if (cur && cur.id && cur.id !== srv.id) await choose(cur.id, cur.name);   // browser memory wins; restores the server
+    else if (srv.id && !cur) localStorage.setItem('printer', JSON.stringify({id: srv.id, name: srv.name}));
+    const id = (cur && cur.id) || srv.id;
+    if (id) renderPrinters([{id, name: (cur && cur.name) || srv.name || 'Saved printer'}], id);
+  } catch (e) {}
+  scan(true);
+}
+
 /* ---- printer status ---- */
 async function refreshStatus() {
   const el = $('#status'), t = $('#status-text');
   try {
     const s = await (await fetch('/api/status')).json();
     if (s.busy) { el.className = 'status warn'; t.textContent = 'Printer busy printing'; return; }
+    if (!s.selected && !s.connected) { el.className = 'status bad'; t.textContent = 'No printer selected'; return; }
     if (!s.connected) { el.className = 'status bad'; t.textContent = s.error || 'Printer not connected'; return; }
     const bits = ['Connected'];
     bits.push(s.low_battery ? 'battery LOW' : s.battery != null ? `battery ${s.battery}%` : 'battery ?');
@@ -144,4 +207,4 @@ $('#print').onclick = async () => {
   finally { clearInterval(poll); printing = false; $('#print').disabled = false; refreshStatus(); }
 };
 
-loadDesigns(); refreshStatus();
+loadDesigns(); loadCaps(); initPrinter();
